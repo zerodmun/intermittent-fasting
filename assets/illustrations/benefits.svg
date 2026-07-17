@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <circle cx="100" cy="100" r="80" fill="#E8F5E9" />
+  <!-- Battery body -->
+  <rect x="70" y="60" width="60" height="90" rx="10" fill="none" stroke="#4CAF50" stroke-width="6" />
+  <rect x="90" y="50" width="20" height="10" rx="3" fill="#4CAF50" />
+  <!-- Battery charge levels -->
+  <rect x="78" y="125" width="44" height="16" rx="3" fill="#81C784" />
+  <rect x="78" y="103" width="44" height="16" rx="3" fill="#81C784" />
+  <rect x="78" y="81" width="44" height="16" rx="3" fill="#4CAF50" />
+  <!-- Health spark/star symbols -->
+  <path d="M50,75 L53,80 L58,81 L54,85 L55,90 L50,87 L45,90 L46,85 L42,81 L47,80 Z" fill="#FFD54F" />
+  <path d="M150,115 L152,118 L157,119 L153,122 L154,127 L150,124 L146,127 L147,122 L143,119 L148,118 Z" fill="#FFD54F" />
+  <!-- Health heart outline overlay -->
+  <path d="M100,105 Q100,95 90,95 A10,10 0 0,0 80,105 Q80,120 100,135 Q120,120 120,105 A10,10 0 0,0 110,95 Q100,95 100,105 Z" fill="#FF5252" opacity="0.85" />
+</svg>

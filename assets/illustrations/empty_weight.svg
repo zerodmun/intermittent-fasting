@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <circle cx="100" cy="100" r="80" fill="#E8F5E9" />
+  <!-- Scale body -->
+  <rect x="55" y="65" width="90" height="80" rx="12" fill="#FFFFFF" stroke="#81C784" stroke-width="4" />
+  <!-- Display window -->
+  <rect x="75" y="77" width="50" height="24" rx="4" fill="#F5F5F5" stroke="#E0E0E0" stroke-width="2" />
+  <!-- Dashed numbers indicator -->
+  <text x="100" y="94" font-family="monospace" font-size="14" fill="#BDBDBD" text-anchor="middle">--.-</text>
+  <!-- Scale footers -->
+  <rect x="65" y="145" width="20" height="8" rx="2" fill="#757575" />
+  <rect x="115" y="145" width="20" height="8" rx="2" fill="#757575" />
+</svg>

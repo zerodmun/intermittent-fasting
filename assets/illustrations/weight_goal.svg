@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <rect width="200" height="200" rx="30" fill="#E8F5E9" />
+  <!-- Weight scale background -->
+  <rect x="50" y="60" width="100" height="90" rx="15" fill="#FFFFFF" stroke="#81C784" stroke-width="6" />
+  <circle cx="100" cy="90" r="22" fill="#E8F5E9" stroke="#4CAF50" stroke-width="4" />
+  <!-- Needle -->
+  <path d="M100,90 L108,76" stroke="#FF7043" stroke-width="4" stroke-linecap="round" />
+  <circle cx="100" cy="90" r="4" fill="#FF7043" />
+  <!-- Display markers -->
+  <path d="M100,68 V72 M85,73 L88,76 M115,73 L112,76" stroke="#4CAF50" stroke-width="2" />
+  <!-- Target icon indicating weight goal -->
+  <circle cx="140" cy="130" r="20" fill="#FF7043" opacity="0.9" />
+  <circle cx="140" cy="130" r="14" fill="#FFFFFF" />
+  <circle cx="140" cy="130" r="8" fill="#FF7043" />
+</svg>

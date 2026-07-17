@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <rect width="200" height="200" rx="30" fill="#E8F5E9" />
+  <!-- Large Gear Cog -->
+  <g transform="translate(100, 100)" fill="#81C784">
+    <circle cx="0" cy="0" r="30" />
+    <!-- Teeth -->
+    <rect x="-10" y="-45" width="20" height="90" rx="4" />
+    <rect x="-10" y="-45" width="20" height="90" rx="4" transform="rotate(45)" />
+    <rect x="-10" y="-45" width="20" height="90" rx="4" transform="rotate(90)" />
+    <rect x="-10" y="-45" width="20" height="90" rx="4" transform="rotate(135)" />
+    <!-- Inner cutout -->
+    <circle cx="0" cy="0" r="18" fill="#E8F5E9" />
+  </g>
+  <!-- Slider Controls overlay -->
+  <rect x="35" y="145" width="130" height="8" rx="4" fill="#C8E6C9" />
+  <circle cx="90" cy="149" r="12" fill="#4CAF50" />
+  <rect x="35" y="45" width="130" height="8" rx="4" fill="#C8E6C9" />
+  <circle cx="120" cy="49" r="12" fill="#4CAF50" />
+</svg>
