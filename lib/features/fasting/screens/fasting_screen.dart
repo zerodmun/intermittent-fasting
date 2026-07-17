@@ -1,17 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
-import 'package:fast_flow/core/constants/app_colors.dart';
-import 'package:fast_flow/core/constants/app_spacing.dart';
-import 'package:fast_flow/core/extensions/context_extensions.dart';
-import 'package:fast_flow/core/extensions/duration_extensions.dart';
-import 'package:fast_flow/core/services/hive_service.dart';
-import 'package:fast_flow/features/fasting/models/fasting_record.dart';
-import 'package:fast_flow/features/fasting/models/fasting_schedule.dart';
-import 'package:fast_flow/features/fasting/providers/fasting_provider.dart';
-import 'package:fast_flow/shared/widgets/animated_progress_ring.dart';
+import 'package:table_calendar/table_calendar.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../../core/theme/color_schemes.dart';
+import '../../../core/constants/app_spacing.dart';
+import '../../../core/constants/app_animations.dart';
+import '../../../core/extensions/context_extensions.dart';
+import '../../../core/extensions/duration_extensions.dart';
+import '../../../core/data/services/hive_service.dart';
+import '../domain/entities/fasting_record.dart';
+import '../domain/entities/fasting_schedule.dart';
+import '../domain/entities/fasting_state.dart';
+import '../presentation/providers/fasting_providers.dart';
+import '../../../shared/widgets/animated_progress_ring.dart';
+import '../../../shared/widgets/app_card.dart';
+import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/app_input.dart';
+import '../../../shared/widgets/app_bottom_sheet.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/section_header.dart';
 
 class FastingScreen extends ConsumerStatefulWidget {
   const FastingScreen({super.key});
@@ -21,47 +30,82 @@ class FastingScreen extends ConsumerStatefulWidget {
 }
 
 class _FastingScreenState extends ConsumerState<FastingScreen> {
-  int _activeSegment = 0; // 0 = Timer, 1 = Schedule, 2 = Timeline, 3 = Calendar
+  int _activeSegment = 0;
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(fastingStateProvider2);
-    final notifier = ref.read(fastingStateProvider2.notifier);
+    final state = ref.watch(fastingStateNotifierProvider);
+    final notifier = ref.read(fastingStateNotifierProvider.notifier);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fasting Schedule'),
+        title: const Text('Fasting Plan'),
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            child: SegmentedButton<int>(
-              segments: const [
-                ButtonSegment(value: 0, label: Text('Timer')),
-                ButtonSegment(value: 1, label: Text('Schedule')),
-                ButtonSegment(value: 2, label: Text('Timeline')),
-                ButtonSegment(value: 3, label: Text('Calendar')),
-              ],
-              selected: {_activeSegment},
-              onSelectionChanged: (val) {
-                setState(() {
-                  _activeSegment = val.first;
-                });
-              },
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.xs),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              ),
+              child: Row(
+                children: [
+                  _buildTabOption(0, 'Timer'),
+                  _buildTabOption(1, 'Schedule'),
+                  _buildTabOption(2, 'Timeline'),
+                  _buildTabOption(3, 'Calendar'),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
           Expanded(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
+              duration: AppAnimations.medium,
               child: _buildSegmentContent(state, notifier),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTabOption(int index, String label) {
+    final isSelected = _activeSegment == index;
+    final theme = Theme.of(context);
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _activeSegment = index),
+        child: AnimatedContainer(
+          duration: AppAnimations.fast,
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: isSelected ? theme.colorScheme.surface : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            boxShadow: isSelected
+                ? AppSpacing.shadowSm(
+                    theme.brightness == Brightness.dark ? Colors.black : theme.colorScheme.outlineVariant,
+                  )
+                : null,
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -82,35 +126,37 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
 
   // ── TIMER SEGMENT ──
   Widget _buildTimerSegment(FastingState? state, FastingStateNotifier notifier) {
-    if (state == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (state == null) return const Center(child: CircularProgressIndicator());
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     Color ringColor;
     IconData centerIcon;
 
     switch (state.status) {
       case FastingStatus.preparing:
-        ringColor = AppColors.amber400;
+        ringColor = context.colors.preparingActive;
         centerIcon = Icons.hourglass_top_rounded;
         break;
       case FastingStatus.fasting:
-        ringColor = AppColors.fastingActive;
+        ringColor = context.colors.fastingActive;
         centerIcon = Icons.nights_stay_outlined;
         break;
       case FastingStatus.eatingWindow:
-        ringColor = AppColors.eatingActive;
+        ringColor = context.colors.eatingActive;
         centerIcon = Icons.restaurant_rounded;
         break;
       case FastingStatus.completed:
-        ringColor = AppColors.success;
-        centerIcon = Icons.check_circle_outline;
+        ringColor = context.colors.completedActive;
+        centerIcon = Icons.check_circle_outline_rounded;
         break;
       case FastingStatus.skipped:
-        ringColor = Colors.grey;
+        ringColor = colorScheme.onSurfaceVariant.withValues(alpha: 0.5);
         centerIcon = Icons.block;
         break;
       default:
-        ringColor = context.colorScheme.primary;
+        ringColor = colorScheme.primary;
         centerIcon = Icons.timer_outlined;
     }
 
@@ -118,44 +164,42 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
 
     return SingleChildScrollView(
       key: const ValueKey('timer_segment'),
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: const EdgeInsets.all(AppSpacing.screenPadding),
       child: Column(
         children: [
-          // Circular Progress Ring
           Center(
             child: AnimatedProgressRing(
               progress: state.progress,
-              size: 260,
+              size: 250,
               strokeWidth: 12,
               color: ringColor,
+              backgroundColor: ringColor.withValues(alpha: 0.15),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(centerIcon, size: 36, color: ringColor),
-                  const SizedBox(height: AppSpacing.xs),
+                  Icon(centerIcon, size: 40, color: ringColor),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                     state.status.name.toUpperCase(),
-                    style: TextStyle(
+                    style: theme.textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
                       color: ringColor,
-                      letterSpacing: 1.2,
+                      letterSpacing: 1.5,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     state.remaining.toHHMMSS,
-                    style: const TextStyle(
-                      fontSize: 32,
+                    style: theme.textTheme.displayMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
+                      letterSpacing: -1.0,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     'Elapsed: ${state.elapsed.toReadable}',
-                    style: context.textTheme.labelSmall?.copyWith(
-                      color: context.colorScheme.onSurface.withValues(alpha: 0.6),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -164,55 +208,59 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
           ),
           const SizedBox(height: AppSpacing.xxl),
 
-          // Today's Schedule Info Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                children: [
-                  Text(
-                    'Today\'s Schedule',
-                    style: context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+          AppCard.elevated(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  "Today's Plan",
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildTimeColumn('Fasting Starts', _formatTime(todaySched['fastHour']!, todaySched['fastMin']!)),
-                      _buildTimeColumn('Eating Starts', _formatTime(todaySched['eatHour']!, todaySched['eatMin']!)),
-                      _buildTimeColumn(
-                        'Fasting Hours',
-                        '${(24.0 - _getEatingMinutes(DateTime.now().weekday, state.schedule) / 60.0).toStringAsFixed(1).replaceAll('.0', '')}h',
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildTimeColumn(context, 'Fasting Starts', _formatTime(todaySched.fastHour, todaySched.fastMin)),
+                    _buildTimeColumn(context, 'Eating Starts', _formatTime(todaySched.eatHour, todaySched.eatMin)),
+                    _buildTimeColumn(
+                      context,
+                      'Fasting Target',
+                      '${(24.0 - _getEatingMinutes(DateTime.now().weekday, state.schedule) / 60.0).toStringAsFixed(1).replaceAll('.0', '')}h',
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.xxl),
 
-          // Manual action overrides
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              FilledButton.icon(
-                icon: const Icon(Icons.check),
-                label: const Text('Mark Completed'),
-                style: FilledButton.styleFrom(backgroundColor: AppColors.success),
-                onPressed: () {
-                  notifier.logManualAction('completed');
-                  context.showSnack('Marked current window as Completed.');
-                },
+              Expanded(
+                child: AppButton(
+                  label: 'Complete Fast',
+                  variant: AppButtonVariant.primary,
+                  icon: Icons.check_circle_outline_rounded,
+                  onPressed: () {
+                    notifier.logManualAction('completed');
+                    context.showSnack('Logged completed fast', isSuccess: true);
+                  },
+                ),
               ),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.block),
-                label: const Text('Skip Fast'),
-                style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                onPressed: () {
-                  notifier.logManualAction('skipped');
-                  context.showSnack('Marked current window as Skipped.');
-                },
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: AppButton(
+                  label: 'Skip Window',
+                  variant: AppButtonVariant.secondary,
+                  icon: Icons.block_rounded,
+                  onPressed: () {
+                    notifier.logManualAction('skipped');
+                    context.showSnack('Logged skipped window');
+                  },
+                ),
               ),
             ],
           ),
@@ -221,41 +269,39 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
     );
   }
 
-  Widget _buildTimeColumn(String label, String value) {
+  Widget _buildTimeColumn(BuildContext context, String label, String value) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         Text(
           label,
-          style: context.textTheme.labelMedium?.copyWith(
-            color: context.colorScheme.onSurface.withValues(alpha: 0.6),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
           value,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          ),
         ),
       ],
     );
   }
 
-  String _formatTime(int hour, int minute) {
-    final h = hour.toString().padLeft(2, '0');
-    final m = minute.toString().padLeft(2, '0');
-    return '$h:$m';
-  }
-
   // ── WEEKLY SCHEDULE SEGMENT ──
   Widget _buildScheduleSegment(FastingState? state, FastingStateNotifier notifier) {
-    if (state == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (state == null) return const Center(child: CircularProgressIndicator());
+
+    final theme = Theme.of(context);
     final schedule = state.schedule;
     final weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     return SingleChildScrollView(
       key: const ValueKey('schedule_segment'),
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.screenPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -263,125 +309,111 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Weekly Schedule Configuration',
-                style: context.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                'Weekly Routine',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              TextButton.icon(
-                icon: const Icon(Icons.copy_all, size: 18),
-                label: const Text('Copy Monday to All'),
+              AppButton.text(
+                label: 'Copy Monday to All',
+                size: AppButtonSize.sm,
                 onPressed: () {
                   final monday = schedule.getScheduleFor(1);
-                  final updatedMap = Map<int, Map<String, int>>.from(schedule.dailySchedules);
+                  final updatedMap = Map<int, DailySchedule>.from(schedule.dailySchedules);
                   for (int i = 2; i <= 7; i++) {
-                    updatedMap[i] = Map<String, int>.from(monday);
+                    updatedMap[i] = DailySchedule(
+                      fastHour: monday.fastHour,
+                      fastMin: monday.fastMin,
+                      eatHour: monday.eatHour,
+                      eatMin: monday.eatMin,
+                    );
                   }
-                  final updatedSchedule = schedule.copyWith(dailySchedules: updatedMap);
-                  notifier.saveSchedule(updatedSchedule);
-                  context.showSnack('Copied Monday schedule to all days.');
+                  HiveService.instance.saveFastingSchedule(schedule.copyWith(dailySchedules: updatedMap));
+                  notifier.onScheduleChanged();
+                  context.showSnack('Routine updated: Monday copied to all days', isSuccess: true);
                 },
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          ...List.generate(7, (index) {
-            final weekdayNum = index + 1;
-            final dayName = weekdays[index];
-            final daySched = schedule.getScheduleFor(weekdayNum);
+          const SizedBox(height: AppSpacing.md),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 7,
+            separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.sm),
+            itemBuilder: (context, idx) {
+              final weekdayNum = idx + 1;
+              final daySched = schedule.getScheduleFor(weekdayNum);
+              final isToday = DateTime.now().weekday == weekdayNum;
 
-            final fastHour = daySched['fastHour']!;
-            final fastMin = daySched['fastMin']!;
-            final eatHour = daySched['eatHour']!;
-            final eatMin = daySched['eatMin']!;
-
-            // Calculate fasting duration
-            final startMin = fastHour * 60 + fastMin;
-            final endMin = (eatHour * 60 + eatMin < startMin)
-                ? (eatHour * 60 + eatMin) + 24 * 60
-                : eatHour * 60 + eatMin;
-            final fastingHoursCount = (endMin - startMin) / 60;
-            final eatingHoursCount = 24.0 - fastingHoursCount;
-
-            return Card(
-              margin: const EdgeInsets.symmetric(vertical: 6),
-              child: Padding(
+              return AppCard.elevated(
                 padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Text(dayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: AppSpacing.xs),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () async {
-                              final selected = await showTimePicker(
-                                context: context,
-                                initialTime: TimeOfDay(hour: fastHour, minute: fastMin),
-                              );
-                              if (selected != null) {
-                                final updatedMap = Map<int, Map<String, int>>.from(schedule.dailySchedules);
-                                updatedMap[weekdayNum] = {
-                                  'fastHour': selected.hour,
-                                  'fastMin': selected.minute,
-                                  'eatHour': eatHour,
-                                  'eatMin': eatMin,
-                                };
-                                notifier.saveSchedule(schedule.copyWith(dailySchedules: updatedMap));
-                              }
-                            },
-                            child: Column(
-                              children: [
-                                const Text('Start Fasting', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                const SizedBox(height: 2),
-                                Text(_formatTime(fastHour, fastMin), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                weekdays[idx],
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: isToday ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              if (isToday) ...[
+                                const SizedBox(width: AppSpacing.sm),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'TODAY',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.onPrimaryContainer,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 9,
+                                    ),
+                                  ),
+                                ),
                               ],
-                            ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () async {
-                              final selected = await showTimePicker(
-                                context: context,
-                                initialTime: TimeOfDay(hour: eatHour, minute: eatMin),
-                              );
-                              if (selected != null) {
-                                final updatedMap = Map<int, Map<String, int>>.from(schedule.dailySchedules);
-                                updatedMap[weekdayNum] = {
-                                  'fastHour': fastHour,
-                                  'fastMin': fastMin,
-                                  'eatHour': selected.hour,
-                                  'eatMin': selected.minute,
-                                };
-                                notifier.saveSchedule(schedule.copyWith(dailySchedules: updatedMap));
-                              }
-                            },
-                            child: Column(
-                              children: [
-                                const Text('Eating Starts', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                const SizedBox(height: 2),
-                                Text(_formatTime(eatHour, eatMin), style: const TextStyle(fontWeight: FontWeight.bold)),
-                              ],
-                            ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Row(
+                            children: [
+                              Icon(Icons.nights_stay_outlined, size: 14, color: context.colors.fastingActive),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Fast: ${_formatTime(daySched.fastHour, daySched.fastMin)}',
+                                style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Icon(Icons.restaurant_rounded, size: 14, color: context.colors.eatingActive),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Eat: ${_formatTime(daySched.eatHour, daySched.eatMin)}',
+                                style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      '${fastingHoursCount.toStringAsFixed(1).replaceAll('.0', '')}h Fasting • ${eatingHoursCount.toStringAsFixed(1).replaceAll('.0', '')}h Eating Window',
-                      style: context.textTheme.labelMedium?.copyWith(
-                        color: context.colorScheme.primary,
-                        fontWeight: FontWeight.w600,
+                        ],
                       ),
+                    ),
+                    IconButton(
+                      onPressed: () => _editDaySchedule(context, weekdayNum, daySched, notifier),
+                      icon: const Icon(Icons.edit_calendar_rounded),
+                      color: theme.colorScheme.primary,
                     ),
                   ],
                 ),
-              ),
-            );
-          }),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -389,105 +421,83 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
 
   // ── TIMELINE SEGMENT ──
   Widget _buildTimelineSegment(FastingState? state) {
-    if (state == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    final now = DateTime.now();
-    final yesterday = now.subtract(const Duration(days: 1));
-    final tomorrow = now.add(const Duration(days: 1));
+    if (state == null) return const Center(child: CircularProgressIndicator());
 
-    return ListView(
+    final theme = Theme.of(context);
+    final days = ['Yesterday', 'Today', 'Tomorrow'];
+
+    return SingleChildScrollView(
       key: const ValueKey('timeline_segment'),
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      children: [
-        _buildTimelineDayCard('Yesterday', yesterday, state.schedule),
-        const SizedBox(height: AppSpacing.md),
-        _buildTimelineDayCard('Today', now, state.schedule, state.status.name),
-        const SizedBox(height: AppSpacing.md),
-        _buildTimelineDayCard('Tomorrow', tomorrow, state.schedule),
-      ],
-    );
-  }
+      padding: const EdgeInsets.all(AppSpacing.screenPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: List.generate(3, (idx) {
+          final date = DateTime.now().add(Duration(days: idx - 1));
+          final sched = state.schedule.getScheduleFor(date.weekday);
+          final record = _getRecordForDay(date);
 
-  Widget _buildTimelineDayCard(String label, DateTime date, FastingSchedule schedule, [String? currentStatus]) {
-    final record = _getRecordForDay(date);
-    final daySched = schedule.getScheduleFor(date.weekday);
-
-    String statusStr = 'Fasting Scheduled';
-    Color statusColor = context.colorScheme.primary;
-
-    if (record != null) {
-      if (record.status == 'completed') {
-        statusStr = 'Completed';
-        statusColor = AppColors.success;
-      } else if (record.status == 'skipped') {
-        statusStr = 'Skipped';
-        statusColor = Colors.grey;
-      } else if (record.status == 'cancelled') {
-        statusStr = 'Cancelled';
-        statusColor = Colors.red;
-      }
-    } else if (currentStatus != null) {
-      statusStr = currentStatus;
-      if (currentStatus == FastingStatus.fasting.name) statusColor = AppColors.fastingActive;
-      if (currentStatus == FastingStatus.eatingWindow.name) statusColor = AppColors.eatingActive;
-      if (currentStatus == FastingStatus.preparing.name) statusColor = AppColors.amber400;
-    }
-
-    final fastingStart = DateTime(date.year, date.month, date.day, daySched['fastHour']!, daySched['fastMin']!);
-    final durationMin = _getFastingMinutes(date.weekday, schedule);
-    final fastingEnd = fastingStart.add(Duration(minutes: durationMin));
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '$label (${DateFormat('MMM d').format(date)})',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: AppCard.elevated(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        days[idx],
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (record != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: record.status == 'completed'
+                                ? context.colors.successContainer
+                                : theme.colorScheme.errorContainer,
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          ),
+                          child: Text(
+                            record.status.toUpperCase(),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: record.status == 'completed'
+                                  ? context.colors.onSuccessContainer
+                                  : theme.colorScheme.onErrorContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  child: Text(
-                    statusStr,
-                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11),
-                  ),
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.md),
+                  _buildTimelineRow('Scheduled Fast', '${_formatTime(sched.fastHour, sched.fastMin)} - ${_formatTime(sched.eatHour, sched.eatMin)}'),
+                  if (record != null) ...[
+                    _buildTimelineRow('Actual Fast', '${DateFormat('HH:mm').format(record.startTime)} - ${record.endTime != null ? DateFormat('HH:mm').format(record.endTime!) : "Active"}'),
+                    _buildTimelineRow('Logged Duration', record.actualDuration.toReadable),
+                    if (record.note != null && record.note!.isNotEmpty)
+                      _buildTimelineRow('Note', record.note!),
+                  ],
+                ],
+              ),
             ),
-            const Divider(height: AppSpacing.lg),
-            _buildTimelineRow('Scheduled', '${DateFormat('h:mm a').format(fastingStart)} → ${DateFormat('h:mm a').format(fastingEnd)}'),
-            _buildTimelineRow('Actual Start', record != null ? DateFormat('h:mm a').format(record.startTime) : '--'),
-            _buildTimelineRow('Actual End', record != null && record.endTime != null ? DateFormat('h:mm a').format(record.endTime!) : '--'),
-            _buildTimelineRow(
-              'Duration',
-              record != null
-                  ? '${(record.endTime?.difference(record.startTime).inMinutes ?? 0)} min'
-                  : '$durationMin min',
-            ),
-          ],
-        ),
+          );
+        }),
       ),
     );
   }
 
-  Widget _buildTimelineRow(String left, String right) {
+  Widget _buildTimelineRow(String label, String value) {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(left, style: const TextStyle(fontSize: 13, color: Colors.grey)),
-          Text(right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          Text(label, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(value, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -495,267 +505,255 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
 
   // ── CALENDAR SEGMENT ──
   Widget _buildCalendarSegment(FastingState? state, FastingStateNotifier notifier) {
-    return Column(
+    if (state == null) return const Center(child: CircularProgressIndicator());
+
+    final theme = Theme.of(context);
+    final selectedRecord = _getRecordForDay(_selectedDay);
+
+    return SingleChildScrollView(
       key: const ValueKey('calendar_segment'),
-      children: [
-        TableCalendar(
-          firstDay: DateTime.now().subtract(const Duration(days: 365)),
-          lastDay: DateTime.now().add(const Duration(days: 365)),
-          focusedDay: _focusedDay,
-          calendarFormat: _calendarFormat,
-          selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-          onDaySelected: (selectedDay, focusedDay) {
-            setState(() {
-              _selectedDay = selectedDay;
-              _focusedDay = focusedDay;
-            });
-          },
-          onFormatChanged: (format) {
-            setState(() {
-              _calendarFormat = format;
-            });
-          },
-          calendarBuilders: CalendarBuilders(
-            markerBuilder: (context, date, events) {
-              final record = _getRecordForDay(date);
-              if (record == null) return null;
-
-              Color dotColor = Colors.grey;
-              if (record.status == 'completed') dotColor = AppColors.success;
-              if (record.status == 'skipped') dotColor = Colors.grey;
-              if (record.status == 'cancelled') dotColor = Colors.red;
-
-              return Positioned(
-                bottom: 4,
-                child: Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor),
+      padding: const EdgeInsets.all(AppSpacing.screenPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppCard.elevated(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: TableCalendar(
+              firstDay: DateTime.now().subtract(const Duration(days: 365)),
+              lastDay: DateTime.now().add(const Duration(days: 365)),
+              focusedDay: _focusedDay,
+              calendarFormat: _calendarFormat,
+              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+              onDaySelected: (selectedDay, focusedDay) {
+                setState(() {
+                  _selectedDay = selectedDay;
+                  _focusedDay = focusedDay;
+                });
+              },
+              onFormatChanged: (format) {
+                setState(() {
+                  _calendarFormat = format;
+                });
+              },
+              calendarStyle: CalendarStyle(
+                selectedDecoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  shape: BoxShape.circle,
                 ),
-              );
-            },
+                todayDecoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.35),
+                  shape: BoxShape.circle,
+                ),
+                markerDecoration: BoxDecoration(
+                  color: context.colors.success,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              eventLoader: (day) {
+                final r = _getRecordForDay(day);
+                return r != null ? [r] : [];
+              },
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Expanded(
-          child: _buildSelectedDayDetails(_selectedDay, state!.schedule, notifier),
-        ),
-      ],
+          const SizedBox(height: AppSpacing.lg),
+
+          SectionHeader(title: 'Details for ${DateFormat('MMMM dd').format(_selectedDay)}'),
+          if (selectedRecord != null) ...[
+            AppCard.elevated(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        selectedRecord.planName,
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        onPressed: () => _editManualLogSheet(context, selectedRecord, notifier),
+                        icon: const Icon(Icons.edit_calendar_rounded),
+                        color: theme.colorScheme.primary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _buildTimelineRow('Fasted Time', selectedRecord.actualDuration.toReadable),
+                  _buildTimelineRow('Status', selectedRecord.status.toUpperCase()),
+                  if (selectedRecord.note != null && selectedRecord.note!.isNotEmpty)
+                    _buildTimelineRow('Notes', selectedRecord.note!),
+                ],
+              ),
+            ),
+          ] else ...[
+            AppCard.outlined(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  children: [
+                    Text(
+                      'No fasting log found for this day.',
+                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    AppButton.outlined(
+                      label: 'Log Manually',
+                      onPressed: () => _createManualLogSheet(context, _selectedDay, state.schedule, notifier),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
-  Widget _buildSelectedDayDetails(DateTime date, FastingSchedule schedule, FastingStateNotifier notifier) {
-    final record = _getRecordForDay(date);
-    final daySched = schedule.getScheduleFor(date.weekday);
+  // ── LOG MUTATIONS ──
+  void _editDaySchedule(BuildContext context, int weekdayNum, DailySchedule current, FastingStateNotifier notifier) async {
+    final theme = Theme.of(context);
+    final fastTime = TimeOfDay(hour: current.fastHour, minute: current.fastMin);
+    final eatTime = TimeOfDay(hour: current.eatHour, minute: current.eatMin);
 
-    if (record == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'No record stored for this day yet.\n(Scheduled: ${_formatTime(daySched['fastHour']!, daySched['fastMin']!)} → ${_formatTime(daySched['eatHour']!, daySched['eatMin']!)})',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            ElevatedButton(
-              onPressed: () => _showManualLogSheet(context, date, schedule, notifier),
-              child: const Text('Add Manual Override'),
-            ),
-          ],
-        ),
+    final selectedFast = await showTimePicker(
+      context: context,
+      initialTime: fastTime,
+      helpText: 'Fasting Starts',
+    );
+
+    if (selectedFast == null) return;
+
+    if (context.mounted) {
+      final selectedEat = await showTimePicker(
+        context: context,
+        initialTime: eatTime,
+        helpText: 'Eating Starts',
       );
-    }
 
-    return Card(
-      margin: const EdgeInsets.all(AppSpacing.lg),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+      if (selectedEat == null) return;
+
+      final updatedSched = notifier.state?.schedule.copyWith() ?? FastingSchedule.defaultSchedule();
+      updatedSched.dailySchedules[weekdayNum] = DailySchedule(
+        fastHour: selectedFast.hour,
+        fastMin: selectedFast.minute,
+        eatHour: selectedEat.hour,
+        eatMin: selectedEat.minute,
+      );
+
+      await HiveService.instance.saveFastingSchedule(updatedSched);
+      notifier.onScheduleChanged();
+      context.showSnack('Plan updated successfully', isSuccess: true);
+    }
+  }
+
+  void _createManualLogSheet(BuildContext context, DateTime day, FastingSchedule schedule, FastingStateNotifier notifier) {
+    final noteController = TextEditingController();
+    final daySched = schedule.getScheduleFor(day.weekday);
+    final formKey = GlobalKey<FormState>();
+
+    AppBottomSheet.show(
+      context: context,
+      title: 'Manual Day Entry',
+      child: Form(
+        key: formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Fasting Record: ${DateFormat('MMM d').format(date)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 20),
-                  onPressed: () => _showManualLogSheet(context, date, schedule, notifier, record),
-                ),
-              ],
+            Text('Input records for ${DateFormat('MMMM dd, yyyy').format(day)}.'),
+            const SizedBox(height: AppSpacing.md),
+            AppInput(
+              label: 'Note / Reason',
+              controller: noteController,
+              hint: 'e.g. Completed scheduled fast successfully.',
             ),
-            const Divider(height: AppSpacing.lg),
-            _buildTimelineRow('Start Time', DateFormat('MMM d, h:mm a').format(record.startTime)),
-            _buildTimelineRow('End Time', record.endTime != null ? DateFormat('MMM d, h:mm a').format(record.endTime!) : '--'),
-            _buildTimelineRow('Fasting Status', record.status.toUpperCase()),
-            _buildTimelineRow('Fasting Duration', '${record.fastingMinutes} minutes'),
-            if (record.note != null) _buildTimelineRow('Note', record.note!),
-            if (record.reason != null) _buildTimelineRow('Reason', record.reason!),
+            const SizedBox(height: AppSpacing.lg),
+            AppButton.primary(
+              label: 'Log as Completed',
+              onPressed: () {
+                final record = FastingRecord(
+                  id: const Uuid().v4(),
+                  planName: '16:8 Fast',
+                  fastingMinutes: 16 * 60,
+                  eatingMinutes: 8 * 60,
+                  startTime: DateTime(day.year, day.month, day.day, daySched.fastHour, daySched.fastMin),
+                  endTime: DateTime(day.year, day.month, day.day, daySched.eatHour, daySched.eatMin),
+                  status: 'completed',
+                  note: noteController.text,
+                );
+
+                HiveService.instance.saveFastingRecord(record);
+                notifier.refresh();
+                Navigator.of(context).pop();
+                context.showSnack('Day logged as Completed', isSuccess: true);
+              },
+            ),
           ],
         ),
       ),
     );
   }
 
-  void _showManualLogSheet(
-    BuildContext context,
-    DateTime date,
-    FastingSchedule schedule,
-    FastingStateNotifier notifier, [
-    FastingRecord? existing,
-  ]) {
-    final noteController = TextEditingController(text: existing?.note ?? '');
-    final reasonController = TextEditingController(text: existing?.reason ?? '');
-    var status = existing?.status ?? 'completed';
+  void _editManualLogSheet(BuildContext context, FastingRecord existing, FastingStateNotifier notifier) {
+    final noteController = TextEditingController(text: existing.note ?? '');
 
-    final daySched = schedule.getScheduleFor(date.weekday);
-
-    var startHour = existing?.startTime.hour ?? daySched['fastHour']!;
-    var startMin = existing?.startTime.minute ?? daySched['fastMin']!;
-
-    var endHour = existing?.endTime?.hour ?? daySched['eatHour']!;
-    var endMin = existing?.endTime?.minute ?? daySched['eatMin']!;
-
-    showModalBottomSheet(
+    AppBottomSheet.show(
       context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        existing != null ? 'Edit Override Record' : 'Add Override Record',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-
-                      // Status Selection
-                      DropdownButton<String>(
-                        value: status,
-                        isExpanded: true,
-                        onChanged: (val) {
-                          if (val != null) setModalState(() => status = val);
-                        },
-                        items: const [
-                          DropdownMenuItem(value: 'completed', child: Text('Completed')),
-                          DropdownMenuItem(value: 'skipped', child: Text('Skipped')),
-                          DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-
-                      // Start picker
-                      ListTile(
-                        leading: const Icon(Icons.play_arrow_outlined),
-                        title: const Text('Actual Fasting Start'),
-                        trailing: Text(_formatTime(startHour, startMin)),
-                        onTap: () async {
-                          final selected = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay(hour: startHour, minute: startMin),
-                          );
-                          if (selected != null) {
-                            setModalState(() {
-                              startHour = selected.hour;
-                              startMin = selected.minute;
-                            });
-                          }
-                        },
-                      ),
-
-                      // End picker
-                      ListTile(
-                        leading: const Icon(Icons.stop_outlined),
-                        title: const Text('Actual Eating Start'),
-                        trailing: Text(_formatTime(endHour, endMin)),
-                        onTap: () async {
-                          final selected = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay(hour: endHour, minute: endMin),
-                          );
-                          if (selected != null) {
-                            setModalState(() {
-                              endHour = selected.hour;
-                              endMin = selected.minute;
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-
-                      // Note field
-                      TextField(
-                        controller: noteController,
-                        decoration: const InputDecoration(labelText: 'Notes'),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-
-                      // Reason field
-                      TextField(
-                        controller: reasonController,
-                        decoration: const InputDecoration(labelText: 'Reason'),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-
-                      ElevatedButton(
-                        onPressed: () {
-                          final startDt = DateTime(date.year, date.month, date.day, startHour, startMin);
-                          var endDt = DateTime(date.year, date.month, date.day, endHour, endMin);
-                          if (endDt.isBefore(startDt)) {
-                            // Overnight adjust
-                            endDt = endDt.add(const Duration(days: 1));
-                          }
-
-                          if (existing != null) {
-                            notifier.editFastingRecord(
-                              id: existing.id,
-                              startTime: startDt,
-                              endTime: endDt,
-                              status: status,
-                              note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
-                              reason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
-                            );
-                          } else {
-                            final record = FastingRecord(
-                              id: const Uuid().v4(),
-                              planName: 'Manual Override',
-                              fastingMinutes: endDt.difference(startDt).inMinutes,
-                              eatingMinutes: _getEatingMinutes(date.weekday, schedule),
-                              startTime: startDt,
-                              endTime: endDt,
-                              status: status,
-                              note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
-                              reason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
-                            );
-                            HiveService.instance.saveFastingRecord(record);
-                          }
-                          Navigator.pop(context);
-                          context.showSnack('Fasting record override saved.');
-                          setState(() {});
-                        },
-                        child: const Text('Save Record Override'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
+      title: 'Edit Day Log',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppInput(
+            label: 'Note',
+            controller: noteController,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppButton.primary(
+            label: 'Save Changes',
+            onPressed: () {
+              existing.note = noteController.text;
+              HiveService.instance.saveFastingRecord(existing);
+              notifier.refresh();
+              Navigator.of(context).pop();
+              context.showSnack('Log updated successfully', isSuccess: true);
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton.outlined(
+            label: 'Delete Log',
+            onPressed: () async {
+              final confirm = await AppDialog.showConfirm(
+                context: context,
+                title: 'Delete Log',
+                content: 'Are you sure you want to delete this fasting record?',
+                isDestructive: true,
+              );
+              if (confirm == true && context.mounted) {
+                await HiveService.instance.deleteFastingRecord(existing.id);
+                notifier.refresh();
+                Navigator.of(context).pop();
+                context.showSnack('Fasting record deleted');
+              }
+            },
+          ),
+        ],
+      ),
     );
+  }
+
+  // ── UTILS ──
+  String _formatTime(int hour, int minute) {
+    final h = hour.toString().padLeft(2, '0');
+    final m = minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  int _getEatingMinutes(int weekday, FastingSchedule schedule) {
+    final daySched = schedule.getScheduleFor(weekday);
+    final start = daySched.eatHour * 60 + daySched.eatMin;
+    var end = daySched.fastHour * 60 + daySched.fastMin;
+    if (end < start) end += 24 * 60;
+    return end - start;
   }
 
   FastingRecord? _getRecordForDay(DateTime date) {
@@ -768,21 +766,5 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
       }
     }
     return null;
-  }
-
-  int _getFastingMinutes(int weekday, FastingSchedule schedule) {
-    final daySched = schedule.getScheduleFor(weekday);
-    final start = daySched['fastHour']! * 60 + daySched['fastMin']!;
-    var end = daySched['eatHour']! * 60 + daySched['eatMin']!;
-    if (end < start) end += 24 * 60;
-    return end - start;
-  }
-
-  int _getEatingMinutes(int weekday, FastingSchedule schedule) {
-    final daySched = schedule.getScheduleFor(weekday);
-    final start = daySched['eatHour']! * 60 + daySched['eatMin']!;
-    var end = daySched['fastHour']! * 60 + daySched['fastMin']!;
-    if (end < start) end += 24 * 60;
-    return end - start;
   }
 }

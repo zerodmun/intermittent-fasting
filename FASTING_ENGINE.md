@@ -1,8 +1,8 @@
-# FastFlow Fasting Engine Documentation
+# Fomo IF Fasting Engine Documentation
 
 ## Overview
 
-The FastFlow fasting engine is a **singleton service** that calculates fasting state in real-time from:
+The Fomo IF fasting engine is a **singleton service** that calculates fasting state in real-time from:
 - **Current DateTime** (system clock)
 - **User Daily Schedule** (single source of truth)
 

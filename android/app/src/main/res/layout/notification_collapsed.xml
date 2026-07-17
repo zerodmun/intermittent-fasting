@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="64dp"
+    android:background="@color/widget_background"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <!-- Status Indicator Icon -->
+    <ImageView
+        android:id="@+id/notification_status_icon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_centerVertical="true"
+        android:src="@drawable/ic_timer"
+        android:contentDescription="Status Icon" />
+
+    <!-- Status Title -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_toEndOf="@id/notification_status_icon"
+        android:layout_marginStart="12dp"
+        android:layout_centerVertical="true">
+
+        <TextView
+            android:id="@+id/notification_status_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="FASTING"
+            android:textColor="@color/widget_text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/notification_subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="36m remaining"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <!-- Large Timer Display on Right -->
+    <TextView
+        android:id="@+id/notification_large_timer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:text="15:24:18"
+        android:textColor="@color/widget_text_primary"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <!-- Tiny Progress Bar at the absolute bottom -->
+    <ImageView
+        android:id="@+id/notification_progress_bar"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        android:layout_alignParentBottom="true"
+        android:scaleType="fitXY"
+        android:contentDescription="Progress Bar" />
+</RelativeLayout>

@@ -8,6 +8,8 @@ import 'package:fast_flow/features/onboarding/screens/onboarding_screen.dart';
 import 'package:fast_flow/features/settings/screens/settings_screen.dart';
 import 'package:fast_flow/features/statistics/screens/statistics_screen.dart';
 import 'package:fast_flow/features/weight/screens/weight_screen.dart';
+import 'package:fast_flow/features/body_composition/presentation/screens/body_comp_screen.dart';
+import 'package:fast_flow/features/body_composition/presentation/screens/progress_photos_screen.dart';
 import 'package:fast_flow/shared/widgets/app_scaffold.dart';
 
 /// App-wide route configuration using GoRouter with shell routing.
@@ -23,6 +25,7 @@ class AppRouter {
   static const String settings = '/settings';
   static const String fasting = '/fasting';
   static const String weight = '/weight';
+  static const String bodyComposition = '/home/body-composition';
 
   late final GoRouter router = GoRouter(
     initialLocation: home,
@@ -58,6 +61,16 @@ class AppRouter {
                   GoRoute(
                     path: 'weight',
                     builder: (context, state) => const WeightScreen(),
+                  ),
+                  GoRoute(
+                    path: 'body-composition',
+                    builder: (context, state) => const BodyCompScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'photos',
+                        builder: (context, state) => const ProgressPhotosScreen(),
+                      ),
+                    ],
                   ),
                 ],
               ),

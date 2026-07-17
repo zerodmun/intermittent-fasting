@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:padding="16dp"
+    android:background="@drawable/widget_bg"
+    android:gravity="center_vertical">
+
+    <!-- Left Side: Progress Gauge -->
+    <RelativeLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1.2">
+
+        <ImageView
+            android:id="@+id/widget_progress_ring"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter"
+            android:layout_centerInParent="true" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_centerInParent="true">
+
+            <TextView
+                android:id="@+id/widget_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FASTING"
+                android:textColor="@color/widget_text_secondary"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_countdown_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="15:34:12"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </RelativeLayout>
+
+    <FrameLayout
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="@color/widget_divider"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp" />
+
+    <!-- Right Side: Details & Schedule -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="2.0"
+        android:orientation="vertical"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/widget_detail_header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="FASTING WINDOW"
+            android:textColor="@color/widget_text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_remaining_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="02h 25m remaining"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="10sp"
+            android:layout_marginTop="2dp" />
+
+        <TextView
+            android:id="@+id/widget_transition_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Eating starts at 09:00"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="10sp"
+            android:layout_marginTop="2dp" />
+
+        <TextView
+            android:id="@+id/widget_streak_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔥 5 Days Streak"
+            android:textColor="@color/widget_text_primary"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:layout_marginTop="6dp" />
+    </LinearLayout>
+</LinearLayout>

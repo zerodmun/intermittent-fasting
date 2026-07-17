@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:fast_flow/core/constants/app_spacing.dart';
-import 'package:fast_flow/core/extensions/context_extensions.dart';
-import 'package:fast_flow/core/services/hive_service.dart';
-import 'package:fast_flow/core/services/notification_service.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:fast_flow/features/settings/providers/settings_provider.dart';
+
+import '../../../core/constants/app_spacing.dart';
+import '../../../core/constants/app_animations.dart';
+import '../../../core/extensions/context_extensions.dart';
+import '../../../core/data/services/hive_service.dart';
+import '../../../core/services/notification_service.dart';
+import '../../../core/services/widget_sync_service.dart';
+import '../presentation/providers/settings_providers.dart';
+import '../../../shared/widgets/app_card.dart';
+import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/section_header.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -16,53 +21,84 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final themeNotifier = ref.read(themeModeProvider.notifier);
-
     final notificationsEnabled = ref.watch(notificationsEnabledProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.screenPadding,
+          vertical: AppSpacing.md,
+        ),
         children: [
-          Center(
-            child: SvgPicture.asset(
-              'assets/illustrations/settings_illustration.svg',
-              height: 120,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _buildSectionHeader(context, 'Appearance'),
-          Card(
+          const SectionHeader(title: 'Appearance'),
+          AppCard.elevated(
             child: ListTile(
-              title: const Text('Theme Mode'),
-              subtitle: Text(themeMode.name.toUpperCase()),
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                'Theme Mode',
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                themeMode.name.toUpperCase(),
+                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
               trailing: SegmentedButton<ThemeMode>(
                 segments: const [
-                  ButtonSegment(value: ThemeMode.light, label: Icon(Icons.light_mode)),
-                  ButtonSegment(value: ThemeMode.dark, label: Icon(Icons.dark_mode)),
-                  ButtonSegment(value: ThemeMode.system, label: Icon(Icons.settings)),
+                  ButtonSegment(
+                    value: ThemeMode.light,
+                    icon: Icon(Icons.light_mode_rounded),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.dark,
+                    icon: Icon(Icons.dark_mode_rounded),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.system,
+                    icon: Icon(Icons.settings_rounded),
+                  ),
                 ],
                 selected: {themeMode},
                 onSelectionChanged: (set) => themeNotifier.setThemeMode(set.first),
               ),
             ),
           ),
-          _buildSectionHeader(context, 'Fasting Preferences'),
-          Card(
+          const SizedBox(height: AppSpacing.md),
+
+          const SectionHeader(title: 'Fasting Preferences'),
+          AppCard.elevated(
             child: ListTile(
-              title: const Text('Daily Fasting Schedule'),
-              subtitle: const Text('Configure custom fasting and eating hours for each day.'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                'Daily Fasting Schedule',
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                'Configure custom fasting and eating hours.',
+                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
+              trailing: Icon(Icons.chevron_right_rounded, color: colorScheme.primary),
               onTap: () => context.go('/home/fasting'),
             ),
           ),
-          _buildSectionHeader(context, 'Notifications'),
-          Card(
+          const SizedBox(height: AppSpacing.md),
+
+          const SectionHeader(title: 'Notifications'),
+          AppCard.elevated(
             child: SwitchListTile(
-              title: const Text('Enable Reminders'),
-              subtitle: const Text('Notify when fasting/eating window starts or finishes.'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                'Enable Reminders',
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                'Notify when fasting or eating windows transition.',
+                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
               value: notificationsEnabled,
               onChanged: (val) async {
                 ref.read(notificationsEnabledProvider.notifier).setEnabled(val);
@@ -74,125 +110,204 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
           ),
-          _buildSectionHeader(context, 'Data Management'),
-          Card(
+          const SizedBox(height: AppSpacing.md),
+
+          const SectionHeader(title: 'Widgets & Persistent Notification'),
+          AppCard.elevated(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Home Screen Widget',
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Enable dynamic update of home widgets.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  value: WidgetSyncService.instance.settings.widgetEnabled,
+                  onChanged: (val) {
+                    WidgetSyncService.instance.updateSettings(
+                      WidgetSyncService.instance.settings.copyWith(widgetEnabled: val),
+                    );
+                    (context as Element).markNeedsBuild();
+                  },
+                ),
+                const Divider(),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Persistent Countdown Notification',
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Show ongoing status and timer in notification drawer.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  value: WidgetSyncService.instance.settings.notificationEnabled,
+                  onChanged: (val) {
+                    WidgetSyncService.instance.updateSettings(
+                      WidgetSyncService.instance.settings.copyWith(notificationEnabled: val),
+                    );
+                    (context as Element).markNeedsBuild();
+                  },
+                ),
+                const Divider(),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Live Countdown Timer',
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Display exact remaining hours and minutes.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  value: WidgetSyncService.instance.settings.liveCountdownEnabled,
+                  onChanged: (val) {
+                    WidgetSyncService.instance.updateSettings(
+                      WidgetSyncService.instance.settings.copyWith(liveCountdownEnabled: val),
+                    );
+                    (context as Element).markNeedsBuild();
+                  },
+                ),
+                const Divider(),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Fasting Progress Ring',
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Show completed percentage gauge.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  value: WidgetSyncService.instance.settings.progressRingEnabled,
+                  onChanged: (val) {
+                    WidgetSyncService.instance.updateSettings(
+                      WidgetSyncService.instance.settings.copyWith(progressRingEnabled: val),
+                    );
+                    (context as Element).markNeedsBuild();
+                  },
+                ),
+                const Divider(),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Body Fat Information',
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Display latest body fat percentage in widgets.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  value: WidgetSyncService.instance.settings.bodyFatEnabled,
+                  onChanged: (val) {
+                    WidgetSyncService.instance.updateSettings(
+                      WidgetSyncService.instance.settings.copyWith(bodyFatEnabled: val),
+                    );
+                    (context as Element).markNeedsBuild();
+                  },
+                ),
+                const Divider(),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Weight Summary',
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Display current weight stats in large widget.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  value: WidgetSyncService.instance.settings.weightEnabled,
+                  onChanged: (val) {
+                    WidgetSyncService.instance.updateSettings(
+                      WidgetSyncService.instance.settings.copyWith(weightEnabled: val),
+                    );
+                    (context as Element).markNeedsBuild();
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+
+          const SectionHeader(title: 'Data Management'),
+          AppCard.elevated(
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.upload_file),
-                  title: const Text('Export Backup'),
-                  subtitle: const Text('Export all profile, weight, and history data to JSON.'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.upload_file_rounded, color: colorScheme.primary),
+                  title: Text(
+                    'Export Backup',
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Export all profile, weight, and logs to JSON.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
                   onTap: () async {
                     final path = await HiveService.instance.exportData();
                     if (context.mounted) {
                       showDialog(
                         context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Data Exported'),
-                          content: Text('Backup file exported to:\n\n$path'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('OK'),
-                            ),
-                          ],
+                        builder: (context) => AppDialog(
+                          title: 'Data Exported',
+                          content: 'Backup file exported to:\n\n$path',
+                          confirmLabel: 'OK',
+                          onConfirm: () => Navigator.pop(context),
                         ),
                       );
                     }
                   },
                 ),
-                const Divider(height: 1),
+                const Divider(),
                 ListTile(
-                  leading: const Icon(Icons.download),
-                  title: const Text('Import Backup'),
-                  subtitle: const Text('Import previously exported JSON backup.'),
-                  onTap: () {
-                    showDialog(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.delete_forever_rounded, color: colorScheme.error),
+                  title: Text(
+                    'Reset All Data',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.error,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Permanently wipe database and start onboarding.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  onTap: () async {
+                    final confirm = await AppDialog.showConfirm(
                       context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Import Backup'),
-                        content: const Text(
-                          'To import a JSON backup file, place your fastflow_export.json inside your app documents folder or contact support.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Close'),
-                          ),
-                        ],
-                      ),
+                      title: 'Reset All Data',
+                      content: 'Are you sure? This will wipe your profile and logs permanently.',
+                      isDestructive: true,
                     );
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.delete_forever, color: Colors.red),
-                  title: const Text('Reset All Data', style: TextStyle(color: Colors.red)),
-                  subtitle: const Text('Wipe all local user profiles, logs, and settings.'),
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Confirm Reset'),
-                        content: const Text(
-                          'Are you sure you want to delete all user profiles, fasting histories, weight tracking logs, and app settings? This action is irreversible.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () async {
-                              Navigator.pop(context);
-                              await HiveService.instance.resetAll();
-                              final prefs = await SharedPreferences.getInstance();
-                              await prefs.clear();
-                              if (context.mounted) {
-                                context.go('/onboarding');
-                              }
-                            },
-                            child: const Text('Reset Everything', style: TextStyle(color: Colors.red)),
-                          ),
-                        ],
-                      ),
-                    );
+                    if (confirm == true && context.mounted) {
+                      await HiveService.instance.resetAll();
+                      context.go('/onboarding');
+                    }
                   },
                 ),
               ],
             ),
           ),
-          _buildSectionHeader(context, 'About'),
-          const Card(
-            child: Column(
-              children: [
-                ListTile(
-                  title: Text('App Name'),
-                  trailing: Text('FastFlow'),
-                ),
-                Divider(height: 1),
-                ListTile(
-                  title: Text('Version'),
-                  trailing: Text('1.0.0 (Production)'),
-                ),
-              ],
+          const SizedBox(height: AppSpacing.xxl),
+
+          // About Section
+          Center(
+            child: Text(
+              'Fomo IF v1.0.0',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(BuildContext context, String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl, vertical: AppSpacing.sm),
-      child: Text(
-        title,
-        style: context.textTheme.labelMedium?.copyWith(
-          color: context.colorScheme.primary,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
-        ),
       ),
     );
   }

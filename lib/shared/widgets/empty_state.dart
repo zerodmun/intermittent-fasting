@@ -1,56 +1,55 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:fast_flow/core/constants/app_spacing.dart';
+import '../../core/constants/app_spacing.dart';
 
-/// Centered empty state with optional SVG illustration or icon, title, and optional subtitle.
 class EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? subtitle;
   final String? illustrationPath;
+  final Widget? action;
 
   const EmptyState({
     required this.icon,
     required this.title,
     this.subtitle,
     this.illustrationPath,
+    this.action,
     super.key,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.huge),
+        padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (illustrationPath != null) ...[
-              SvgPicture.asset(
+            if (illustrationPath != null)
+              Image.asset(
                 illustrationPath!,
-                height: 140,
-              ),
-            ] else ...[
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
+                height: 180,
+                errorBuilder: (_, __, ___) => Icon(
                   icon,
-                  size: AppSpacing.huge,
-                  color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                  size: AppSpacing.iconXxl * 2.5,
+                  color: colorScheme.primary.withValues(alpha: 0.4),
                 ),
+              )
+            else
+              Icon(
+                icon,
+                size: AppSpacing.iconXxl * 2.5,
+                color: colorScheme.primary.withValues(alpha: 0.4),
               ),
-            ],
-            const SizedBox(height: AppSpacing.xxl),
+            const SizedBox(height: AppSpacing.xlg),
             Text(
               title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -58,11 +57,15 @@ class EmptyState extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               Text(
                 subtitle!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
               ),
+            ],
+            if (action != null) ...[
+              const SizedBox(height: AppSpacing.xlg),
+              action!,
             ],
           ],
         ),

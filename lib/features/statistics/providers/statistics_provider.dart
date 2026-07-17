@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fast_flow/core/helpers/streak_calculator.dart';
-import 'package:fast_flow/core/services/hive_service.dart';
+import 'package:fast_flow/core/data/services/hive_service.dart';
 
 class StatsData {
   final int currentStreak;

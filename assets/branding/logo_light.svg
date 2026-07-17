@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Light background wrapper -->
+  <rect width="512" height="512" fill="#FFFFFF"/>
+  
+  <g transform="translate(0, 0)">
+    <!-- Clock Circle / Progress Ring Track -->
+    <circle cx="256" cy="256" r="200" fill="none" stroke="#F1F5F9" stroke-width="32"/>
+    
+    <!-- Active Arc (Progress Ring) -->
+    <path d="M 256 56 A 200 200 0 1 1 114.5 397.4" fill="none" stroke="#4CAF50" stroke-width="32" stroke-linecap="round"/>
+    
+    <!-- Crescent Moon -->
+    <path d="M 270 120 A 136 136 0 0 1 270 392 A 110 110 0 0 0 350 256 A 110 110 0 0 0 270 120 Z" fill="#009688"/>
+    
+    <!-- Leaf curving gracefully -->
+    <path d="M 256 256 C 210 200 170 190 140 210 C 120 224 116 260 146 296 C 176 332 216 320 256 256 Z" fill="#81C784"/>
+    <path d="M 256 256 C 270 200 310 190 340 210 C 360 224 364 260 334 296 C 304 332 264 320 256 256 Z" fill="#4CAF50" opacity="0.8"/>
+    
+    <!-- Clock Hands -->
+    <line x1="256" y1="256" x2="256" y2="150" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+    <line x1="256" y1="256" x2="310" y2="256" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_background">#FFFFFF</color>
+    <color name="widget_background_card">#F8FAFC</color>
+    <color name="widget_text_primary">#0F172A</color>
+    <color name="widget_text_secondary">#475569</color>
+    <color name="widget_divider">#E2E8F0</color>
+    
+    <!-- State colors -->
+    <color name="state_preparing">#3B82F6</color> <!-- Blue -->
+    <color name="state_fasting">#10B981</color> <!-- Green -->
+    <color name="state_eating">#F97316</color> <!-- Orange -->
+    <color name="state_completed">#14B8A6</color> <!-- Teal -->
+    <color name="state_skipped">#94A3B8</color> <!-- Gray -->
+	<color name="ic_launcher_background">#FFFFFF</color>
+</resources>

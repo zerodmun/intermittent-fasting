@@ -1,143 +1,126 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Typography system using Google Fonts Inter.
-abstract final class AppTypography {
-  static String get _fontFamily => GoogleFonts.inter().fontFamily!;
+/// Centralized Typography system for FastFlow.
+class AppTypography {
+  AppTypography._();
 
-  // ── Display ──
-  static TextStyle get displayLarge => TextStyle(
-        fontFamily: _fontFamily,
+  // ── Font Weights ──
+  static const FontWeight light = FontWeight.w300;
+  static const FontWeight regular = FontWeight.w400;
+  static const FontWeight medium = FontWeight.w500;
+  static const FontWeight semiBold = FontWeight.w600;
+  static const FontWeight bold = FontWeight.w700;
+  static const FontWeight extraBold = FontWeight.w800;
+
+  // ── Line Heights ──
+  static const double lineHeightTight = 1.1;
+  static const double lineHeightNormal = 1.4;
+  static const double lineHeightRelaxed = 1.6;
+
+  // ── Text Styles (Google Fonts Inter base) ──
+  static TextStyle get displayLarge => GoogleFonts.inter(
         fontSize: 57,
-        fontWeight: FontWeight.w400,
+        fontWeight: regular,
+        height: lineHeightTight,
         letterSpacing: -0.25,
-        height: 1.12,
       );
 
-  static TextStyle get displayMedium => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get displayMedium => GoogleFonts.inter(
         fontSize: 45,
-        fontWeight: FontWeight.w400,
-        height: 1.16,
+        fontWeight: regular,
+        height: lineHeightTight,
+        letterSpacing: 0,
       );
 
-  static TextStyle get displaySmall => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get displaySmall => GoogleFonts.inter(
         fontSize: 36,
-        fontWeight: FontWeight.w400,
-        height: 1.22,
+        fontWeight: regular,
+        height: lineHeightTight,
+        letterSpacing: 0,
       );
 
-  // ── Headline ──
-  static TextStyle get headlineLarge => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get headlineLarge => GoogleFonts.inter(
         fontSize: 32,
-        fontWeight: FontWeight.w600,
-        height: 1.25,
+        fontWeight: bold,
+        height: lineHeightNormal,
+        letterSpacing: 0,
       );
 
-  static TextStyle get headlineMedium => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get headlineMedium => GoogleFonts.inter(
         fontSize: 28,
-        fontWeight: FontWeight.w600,
-        height: 1.29,
+        fontWeight: semiBold,
+        height: lineHeightNormal,
+        letterSpacing: 0,
       );
 
-  static TextStyle get headlineSmall => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get headlineSmall => GoogleFonts.inter(
         fontSize: 24,
-        fontWeight: FontWeight.w600,
-        height: 1.33,
+        fontWeight: semiBold,
+        height: lineHeightNormal,
+        letterSpacing: 0,
       );
 
-  // ── Title ──
-  static TextStyle get titleLarge => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get titleLarge => GoogleFonts.inter(
         fontSize: 22,
-        fontWeight: FontWeight.w600,
-        height: 1.27,
+        fontWeight: semiBold,
+        height: lineHeightNormal,
+        letterSpacing: 0,
       );
 
-  static TextStyle get titleMedium => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get titleMedium => GoogleFonts.inter(
         fontSize: 16,
-        fontWeight: FontWeight.w600,
+        fontWeight: medium,
+        height: lineHeightNormal,
         letterSpacing: 0.15,
-        height: 1.50,
       );
 
-  static TextStyle get titleSmall => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get titleSmall => GoogleFonts.inter(
         fontSize: 14,
-        fontWeight: FontWeight.w600,
+        fontWeight: medium,
+        height: lineHeightNormal,
         letterSpacing: 0.1,
-        height: 1.43,
       );
 
-  // ── Body ──
-  static TextStyle get bodyLarge => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get bodyLarge => GoogleFonts.inter(
         fontSize: 16,
-        fontWeight: FontWeight.w400,
+        fontWeight: regular,
+        height: lineHeightRelaxed,
         letterSpacing: 0.5,
-        height: 1.50,
       );
 
-  static TextStyle get bodyMedium => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get bodyMedium => GoogleFonts.inter(
         fontSize: 14,
-        fontWeight: FontWeight.w400,
+        fontWeight: regular,
+        height: lineHeightRelaxed,
         letterSpacing: 0.25,
-        height: 1.43,
       );
 
-  static TextStyle get bodySmall => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get bodySmall => GoogleFonts.inter(
         fontSize: 12,
-        fontWeight: FontWeight.w400,
+        fontWeight: regular,
+        height: lineHeightRelaxed,
         letterSpacing: 0.4,
-        height: 1.33,
       );
 
-  // ── Label ──
-  static TextStyle get labelLarge => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get labelLarge => GoogleFonts.inter(
         fontSize: 14,
-        fontWeight: FontWeight.w500,
+        fontWeight: medium,
+        height: lineHeightNormal,
         letterSpacing: 0.1,
-        height: 1.43,
       );
 
-  static TextStyle get labelMedium => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get labelMedium => GoogleFonts.inter(
         fontSize: 12,
-        fontWeight: FontWeight.w500,
+        fontWeight: medium,
+        height: lineHeightNormal,
         letterSpacing: 0.5,
-        height: 1.33,
       );
 
-  static TextStyle get labelSmall => TextStyle(
-        fontFamily: _fontFamily,
+  static TextStyle get labelSmall => GoogleFonts.inter(
         fontSize: 11,
-        fontWeight: FontWeight.w500,
+        fontWeight: medium,
+        height: lineHeightNormal,
         letterSpacing: 0.5,
-        height: 1.45,
-      );
-
-  // ── Timer-specific ──
-  static TextStyle get timerDisplay => TextStyle(
-        fontFamily: _fontFamily,
-        fontSize: 48,
-        fontWeight: FontWeight.w700,
-        letterSpacing: -1.0,
-        height: 1.0,
-      );
-
-  static TextStyle get timerLabel => TextStyle(
-        fontFamily: _fontFamily,
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-        letterSpacing: 1.2,
-        height: 1.2,
       );
 }

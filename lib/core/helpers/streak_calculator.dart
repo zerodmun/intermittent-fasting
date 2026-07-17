@@ -1,85 +1,108 @@
-import 'package:fast_flow/features/fasting/models/fasting_record.dart';
+import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 
-/// Result of a streak calculation.
 class StreakResult {
   final int currentStreak;
   final int longestStreak;
+  final int totalCompleted;
+  final DateTime? lastCompletedDate;
 
-  const StreakResult({
+  StreakResult({
     required this.currentStreak,
     required this.longestStreak,
+    required this.totalCompleted,
+    this.lastCompletedDate,
   });
 }
 
-/// Calculates fasting streaks from a list of records.
-///
-/// A streak is defined as consecutive days with at least one
-/// completed fasting session.
-abstract final class StreakCalculator {
+class StreakCalculator {
   static StreakResult calculate(List<FastingRecord> records) {
     if (records.isEmpty) {
-      return const StreakResult(currentStreak: 0, longestStreak: 0);
+      return StreakResult(
+        currentStreak: 0,
+        longestStreak: 0,
+        totalCompleted: 0,
+        lastCompletedDate: null,
+      );
     }
 
-    // Get unique completed days, sorted descending
-    final completedDays = <DateTime>{};
-    for (final record in records) {
-      if (record.status == 'completed' && record.endTime != null) {
-        final day = DateTime(
-          record.startTime.year,
-          record.startTime.month,
-          record.startTime.day,
-        );
-        completedDays.add(day);
-      }
+    // Filter completed records and sort by date
+    final completedRecords = records
+        .where((r) => r.isCompleted)
+        .toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    if (completedRecords.isEmpty) {
+      return StreakResult(
+        currentStreak: 0,
+        longestStreak: 0,
+        totalCompleted: 0,
+        lastCompletedDate: null,
+      );
     }
 
-    if (completedDays.isEmpty) {
-      return const StreakResult(currentStreak: 0, longestStreak: 0);
-    }
-
-    final sortedDays = completedDays.toList()
-      ..sort((a, b) => b.compareTo(a));
-
-    // Calculate current streak (from today or yesterday backwards)
     final today = DateTime.now();
-    final todayStart = DateTime(today.year, today.month, today.day);
-    final yesterdayStart = todayStart.subtract(const Duration(days: 1));
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final yesterday = todayDate.subtract(const Duration(days: 1));
 
+    // Check if today is completed
+    final isTodayCompleted = completedRecords.any((r) =>
+        r.startTime.year == todayDate.year &&
+        r.startTime.month == todayDate.month &&
+        r.startTime.day == todayDate.day);
+
+    // Check if yesterday is completed
+    final isYesterdayCompleted = completedRecords.any((r) =>
+        r.startTime.year == yesterday.year &&
+        r.startTime.month == yesterday.month &&
+        r.startTime.day == yesterday.day);
+
+    // Calculate current streak
     int currentStreak = 0;
     int longestStreak = 0;
-    int tempStreak = 1;
+    int tempStreak = 0;
 
-    // Check if the most recent day is today or yesterday
-    if (sortedDays.first == todayStart || sortedDays.first == yesterdayStart) {
-      currentStreak = 1;
-      for (int i = 1; i < sortedDays.length; i++) {
-        final diff = sortedDays[i - 1].difference(sortedDays[i]).inDays;
-        if (diff == 1) {
-          currentStreak++;
-        } else {
-          break;
-        }
-      }
-    }
+    var checkDate = isTodayCompleted ? todayDate : yesterday;
 
-    // Calculate longest streak
-    for (int i = 1; i < sortedDays.length; i++) {
-      final diff = sortedDays[i - 1].difference(sortedDays[i]).inDays;
-      if (diff == 1) {
+    // Count consecutive days backward
+    while (true) {
+      final hasRecord = completedRecords.any((r) =>
+          r.startTime.year == checkDate.year &&
+          r.startTime.month == checkDate.month &&
+          r.startTime.day == checkDate.day);
+
+      if (hasRecord) {
+        currentStreak++;
         tempStreak++;
+        longestStreak = longestStreak > tempStreak ? longestStreak : tempStreak;
+        checkDate = checkDate.subtract(const Duration(days: 1));
       } else {
-        longestStreak = tempStreak > longestStreak ? tempStreak : longestStreak;
-        tempStreak = 1;
+        break;
       }
     }
-    longestStreak = tempStreak > longestStreak ? tempStreak : longestStreak;
-    longestStreak =
-        currentStreak > longestStreak ? currentStreak : longestStreak;
+
+    // Continue scanning for longest streak in history
+    var scanDate = checkDate;
+    tempStreak = 0;
+    while (scanDate.isAfter(completedRecords.first.startTime.subtract(const Duration(days: 365)))) {
+      final hasRecord = completedRecords.any((r) =>
+          r.startTime.year == scanDate.year &&
+          r.startTime.month == scanDate.month &&
+          r.startTime.day == scanDate.day);
+
+      if (hasRecord) {
+        tempStreak++;
+        longestStreak = longestStreak > tempStreak ? longestStreak : tempStreak;
+      } else {
+        tempStreak = 0;
+      }
+      scanDate = scanDate.subtract(const Duration(days: 1));
+    }
 
     return StreakResult(
       currentStreak: currentStreak,
       longestStreak: longestStreak,
+      totalCompleted: completedRecords.length,
+      lastCompletedDate: completedRecords.last.startTime,
     );
   }
 }

@@ -1,118 +1,133 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
-import 'package:fast_flow/core/services/hive_service.dart';
-import 'package:fast_flow/features/onboarding/models/user_profile.dart';
-import 'package:fast_flow/features/weight/models/weight_entry.dart';
+import 'package:fast_flow/core/data/services/hive_service.dart';
+import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
+import 'package:fast_flow/core/services/widget_sync_service.dart';
+import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
 
 class OnboardingState {
-  final int currentPage;
+  final int currentStep;
   final String name;
   final String gender;
+  final int ageYears;
   final double heightCm;
   final double weightKg;
   final double goalWeightKg;
-  final String selectedPlanId;
-  final String goal;
+  final double targetBodyFat;
+  final double targetWaist;
+  final double targetBmi;
+  final Map<int, DailySchedule> dailySchedules;
 
-  const OnboardingState({
-    this.currentPage = 0,
+  OnboardingState({
+    this.currentStep = 0,
     this.name = '',
-    this.gender = 'Male',
-    this.heightCm = 170.0,
-    this.weightKg = 70.0,
-    this.goalWeightKg = 65.0,
-    this.selectedPlanId = '16_8',
-    this.goal = 'Lose Weight',
-  });
+    this.gender = 'male',
+    this.ageYears = 25,
+    this.heightCm = 170,
+    this.weightKg = 70,
+    this.goalWeightKg = 65,
+    this.targetBodyFat = 15,
+    this.targetWaist = 80,
+    this.targetBmi = 22,
+    Map<int, DailySchedule>? dailySchedules,
+  }) : dailySchedules = dailySchedules ?? _defaultSchedules();
+
+  static Map<int, DailySchedule> _defaultSchedules() {
+    final schedules = <int, DailySchedule>{};
+    for (int day = 1; day <= 7; day++) {
+      schedules[day] = DailySchedule(
+        fastHour: 20,
+        fastMin: 0,
+        eatHour: 12,
+        eatMin: 0,
+      );
+    }
+    return schedules;
+  }
 
   OnboardingState copyWith({
-    int? currentPage,
+    int? currentStep,
     String? name,
     String? gender,
+    int? ageYears,
     double? heightCm,
     double? weightKg,
     double? goalWeightKg,
-    String? selectedPlanId,
-    String? goal,
+    double? targetBodyFat,
+    double? targetWaist,
+    double? targetBmi,
+    Map<int, DailySchedule>? dailySchedules,
   }) {
     return OnboardingState(
-      currentPage: currentPage ?? this.currentPage,
+      currentStep: currentStep ?? this.currentStep,
       name: name ?? this.name,
       gender: gender ?? this.gender,
+      ageYears: ageYears ?? this.ageYears,
       heightCm: heightCm ?? this.heightCm,
       weightKg: weightKg ?? this.weightKg,
       goalWeightKg: goalWeightKg ?? this.goalWeightKg,
-      selectedPlanId: selectedPlanId ?? this.selectedPlanId,
-      goal: goal ?? this.goal,
+      targetBodyFat: targetBodyFat ?? this.targetBodyFat,
+      targetWaist: targetWaist ?? this.targetWaist,
+      targetBmi: targetBmi ?? this.targetBmi,
+      dailySchedules: dailySchedules ?? this.dailySchedules,
     );
   }
 }
 
 class OnboardingNotifier extends Notifier<OnboardingState> {
   @override
-  OnboardingState build() {
-    return const OnboardingState();
+  OnboardingState build() => OnboardingState();
+
+  void nextStep() => state = state.copyWith(currentStep: state.currentStep + 1);
+  void prevStep() => state = state.copyWith(currentStep: state.currentStep - 1);
+
+  void updateProfile({
+    String? name,
+    String? gender,
+    int? ageYears,
+    double? heightCm,
+    double? weightKg,
+    double? goalWeightKg,
+    double? targetBodyFat,
+    double? targetWaist,
+    double? targetBmi,
+  }) {
+    state = state.copyWith(
+      name: name ?? state.name,
+      gender: gender ?? state.gender,
+      ageYears: ageYears ?? state.ageYears,
+      heightCm: heightCm ?? state.heightCm,
+      weightKg: weightKg ?? state.weightKg,
+      goalWeightKg: goalWeightKg ?? state.goalWeightKg,
+      targetBodyFat: targetBodyFat ?? state.targetBodyFat,
+      targetWaist: targetWaist ?? state.targetWaist,
+      targetBmi: targetBmi ?? state.targetBmi,
+    );
   }
 
-  void setPage(int page) {
-    state = state.copyWith(currentPage: page);
-  }
-
-  void setName(String name) {
-    state = state.copyWith(name: name);
-  }
-
-  void setGender(String gender) {
-    state = state.copyWith(gender: gender);
-  }
-
-  void setHeight(double height) {
-    state = state.copyWith(heightCm: height);
-  }
-
-  void setWeight(double weight) {
-    state = state.copyWith(weightKg: weight);
-  }
-
-  void setGoalWeight(double weight) {
-    state = state.copyWith(goalWeightKg: weight);
-  }
-
-  void setPlan(String planId) {
-    state = state.copyWith(selectedPlanId: planId);
-  }
-
-  void setGoal(String goal) {
-    state = state.copyWith(goal: goal);
+  void updateSchedules(Map<int, DailySchedule> schedules) {
+    state = state.copyWith(dailySchedules: schedules);
   }
 
   Future<void> completeOnboarding() async {
     final profile = UserProfile(
-      name: state.name.trim().isEmpty ? 'Faster' : state.name.trim(),
+      name: state.name,
       gender: state.gender,
+      ageYears: state.ageYears,
       heightCm: state.heightCm,
       weightKg: state.weightKg,
       goalWeightKg: state.goalWeightKg,
-      selectedPlanId: state.selectedPlanId,
+      targetBodyFat: state.targetBodyFat,
+      targetWaist: state.targetWaist,
+      targetBmi: state.targetBmi,
+      selectedPlanId: 'custom',
       onboardingComplete: true,
     );
 
-    // Save profile to Hive
+    final schedule = FastingSchedule(dailySchedules: state.dailySchedules);
+
     await HiveService.instance.saveUserProfile(profile);
-
-    // Save initial weight entry
-    final weightEntry = WeightEntry(
-      id: const Uuid().v4(),
-      weightKg: state.weightKg,
-      date: DateTime.now(),
-      note: 'Initial weight recorded during onboarding',
-    );
-    await HiveService.instance.saveWeightEntry(weightEntry);
-
-    // Save onboarding completion flag in SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('onboarding_complete', true);
+    await HiveService.instance.saveFastingSchedule(schedule);
+    await WidgetSyncService.instance.syncToNative();
   }
 }
 

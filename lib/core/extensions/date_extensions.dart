@@ -1,7 +1,4 @@
-import 'package:intl/intl.dart';
-
-/// Convenience extensions on [DateTime].
-extension DateExtensions on DateTime {
+extension DateTimeExtensions on DateTime {
   bool get isToday {
     final now = DateTime.now();
     return year == now.year && month == now.month && day == now.day;
@@ -9,9 +6,7 @@ extension DateExtensions on DateTime {
 
   bool get isYesterday {
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    return year == yesterday.year &&
-        month == yesterday.month &&
-        day == yesterday.day;
+    return year == yesterday.year && month == yesterday.month && day == yesterday.day;
   }
 
   bool isSameDay(DateTime other) {
@@ -30,19 +25,26 @@ extension DateExtensions on DateTime {
     return startOfWeek.add(const Duration(days: 6)).endOfDay;
   }
 
-  String get weekdayName => DateFormat.EEEE().format(this);
-  String get weekdayShort => DateFormat.E().format(this);
-  String get monthName => DateFormat.MMMM().format(this);
-  String get monthShort => DateFormat.MMM().format(this);
+  DateTime get startOfMonth => DateTime(year, month, 1);
+  DateTime get endOfMonth => DateTime(year, month + 1, 0, 23, 59, 59);
 
-  String get formatted => DateFormat('MMM d, yyyy').format(this);
-  String get formattedShort => DateFormat('MMM d').format(this);
-  String get formattedTime => DateFormat('h:mm a').format(this);
-  String get formattedDateTime => DateFormat('MMM d, h:mm a').format(this);
+  /// Check if this date is between [start] and [end] (inclusive)
+  bool isBetween(DateTime start, DateTime end) {
+    final thisDay = DateTime(year, month, day);
+    final startDay = DateTime(start.year, start.month, start.day);
+    final endDay = DateTime(end.year, end.month, end.day);
+    return thisDay.isAfter(startDay.subtract(const Duration(days: 1))) &&
+        thisDay.isBefore(endDay.add(const Duration(days: 1)));
+  }
 
-  String get relativeLabel {
-    if (isToday) return 'Today';
-    if (isYesterday) return 'Yesterday';
-    return formatted;
+  /// Returns a copy of this DateTime with the time set to the given hour and minute
+  DateTime atTime(int hour, [int minute = 0]) {
+    return DateTime(year, month, day, hour, minute);
+  }
+
+  /// Returns the date for the given weekday (1=Monday) relative to this date's week
+  DateTime dateForWeekday(int weekday) {
+    final start = startOfWeek;
+    return start.add(Duration(days: weekday - 1));
   }
 }

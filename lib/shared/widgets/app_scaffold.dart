@@ -1,36 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:fast_flow/core/constants/app_spacing.dart';
-
-/// Shell scaffold with bottom [NavigationBar] wrapping tabbed routes.
+/// Root scaffold with bottom navigation bar using StatefulShellRoute.
 class AppScaffold extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
 
-  const AppScaffold({
-    required this.navigationShell,
-    super.key,
-  });
+  const AppScaffold({required this.navigationShell, super.key});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      body: navigationShell,
+      body: SafeArea(
+        child: navigationShell,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (index) {
-          navigationShell.goBranch(
-            index,
-            initialLocation: index == navigationShell.currentIndex,
-          );
-        },
-        height: AppSpacing.bottomNavHeight,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        animationDuration: const Duration(milliseconds: 400),
-        backgroundColor: theme.colorScheme.surface,
-        indicatorColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+        onDestinationSelected: (index) => navigationShell.goBranch(index),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),

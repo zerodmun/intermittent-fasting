@@ -1,30 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
-import 'package:fast_flow/core/constants/app_colors.dart';
-import 'package:fast_flow/core/constants/app_spacing.dart';
-import 'package:fast_flow/core/extensions/context_extensions.dart';
-import 'package:fast_flow/core/extensions/duration_extensions.dart';
-import 'package:fast_flow/features/fasting/models/fasting_record.dart';
-import 'package:fast_flow/features/history/providers/history_provider.dart';
-import 'package:fast_flow/shared/widgets/empty_state.dart';
+import 'package:table_calendar/table_calendar.dart';
+
+import '../../../core/constants/app_spacing.dart';
+import '../../../core/constants/app_animations.dart';
+import '../../../core/extensions/context_extensions.dart';
+import '../../../core/extensions/date_extensions.dart';
+import '../../../core/extensions/duration_extensions.dart';
+import '../../fasting/domain/entities/fasting_record.dart';
+import '../providers/history_providers.dart';
+import '../../../shared/widgets/empty_state.dart';
+import '../../../shared/widgets/app_card.dart';
+import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/animated_list_item.dart';
+import '../../../shared/widgets/shimmer_loading.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final records = ref.watch(historyProvider);
     final isCalendar = ref.watch(historyViewModeProvider);
     final selectedDay = ref.watch(selectedDayProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('History'),
+        title: const Text('History Logs'),
         actions: [
           IconButton(
-            icon: Icon(isCalendar ? Icons.list : Icons.calendar_today),
+            icon: Icon(isCalendar ? Icons.list_alt_rounded : Icons.calendar_month_rounded),
+            color: theme.colorScheme.primary,
             onPressed: () {
               ref.read(historyViewModeProvider.notifier).toggle();
             },
@@ -32,197 +40,198 @@ class HistoryScreen extends ConsumerWidget {
         ],
       ),
       body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
+        duration: AppAnimations.medium,
         child: isCalendar
-            ? _buildCalendarView(context, ref, records, selectedDay)
-            : _buildListView(context, ref, records),
+            ? _buildCalendarView(context, ref, selectedDay)
+            : _buildListView(context, ref),
       ),
     );
   }
 
-  Widget _buildListView(BuildContext context, WidgetRef ref, List<FastingRecord> records) {
-    if (records.isEmpty) {
-      return const EmptyState(
-        key: ValueKey('empty_list'),
-        icon: Icons.history,
-        title: 'No fasting history yet',
-        subtitle: 'Once you complete or cancel a fast, it will show up here.',
-        illustrationPath: 'assets/illustrations/empty_history.svg',
-      );
-    }
+  Widget _buildListView(BuildContext context, WidgetRef ref) {
+    final recordsAsync = ref.watch(historyProvider);
+    final theme = Theme.of(context);
 
-    return ListView.builder(
-      key: const ValueKey('list_view'),
-      itemCount: records.length,
-      itemBuilder: (context, index) {
-        final record = records[index];
-        return _buildDismissibleTile(context, ref, record);
-      },
-    );
-  }
+    return recordsAsync.when(
+      loading: () => ListView.builder(
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        itemCount: 5,
+        itemBuilder: (_, __) => const Padding(
+          padding: EdgeInsets.only(bottom: AppSpacing.md),
+          child: ShimmerLoading(width: double.infinity, height: 75),
+        ),
+      ),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (records) {
+        if (records.isEmpty) {
+          return const EmptyState(
+            key: ValueKey('empty_list'),
+            icon: Icons.history_rounded,
+            title: 'No fasting history yet',
+            subtitle: 'Completed cycles will appear here chronologically.',
+          );
+        }
 
-  Widget _buildCalendarView(
-    BuildContext context,
-    WidgetRef ref,
-    List<FastingRecord> records,
-    DateTime selectedDay,
-  ) {
-    // Helper to find records for a given day
-    List<FastingRecord> getEventsForDay(DateTime day) {
-      return records.where((r) => DateUtils.isSameDay(r.startTime, day)).toList();
-    }
-
-    final selectedEvents = getEventsForDay(selectedDay);
-
-    return Column(
-      key: const ValueKey('calendar_view'),
-      children: [
-        TableCalendar<FastingRecord>(
-          firstDay: DateTime.now().subtract(const Duration(days: 365)),
-          lastDay: DateTime.now().add(const Duration(days: 30)),
-          focusedDay: selectedDay,
-          selectedDayPredicate: (day) => DateUtils.isSameDay(day, selectedDay),
-          eventLoader: getEventsForDay,
-          calendarFormat: CalendarFormat.month,
-          headerStyle: const HeaderStyle(
-            formatButtonVisible: false,
-            titleCentered: true,
-          ),
-          calendarStyle: CalendarStyle(
-            todayDecoration: BoxDecoration(
-              color: context.colorScheme.primary.withValues(alpha: 0.35),
-              shape: BoxShape.circle,
-            ),
-            selectedDecoration: BoxDecoration(
-              color: context.colorScheme.primary,
-              shape: BoxShape.circle,
-            ),
-            markerDecoration: const BoxDecoration(
-              color: AppColors.fastingActive,
-              shape: BoxShape.circle,
-            ),
-          ),
-          onDaySelected: (selected, focused) {
-            ref.read(selectedDayProvider.notifier).select(selected);
+        return ListView.builder(
+          key: const ValueKey('list_view'),
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          itemCount: records.length,
+          itemBuilder: (context, index) {
+            final record = records[index];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: AnimatedListItem(
+                index: index,
+                child: _buildHistoryCard(context, ref, record),
+              ),
+            );
           },
-        ),
-        const Divider(height: 1),
-        Expanded(
-          child: selectedEvents.isEmpty
-              ? const EmptyState(
-                  icon: Icons.event_busy,
-                  title: 'No activities on this day',
-                  illustrationPath: 'assets/illustrations/empty_history.svg',
-                )
-              : ListView.builder(
-                  itemCount: selectedEvents.length,
-                  itemBuilder: (context, index) {
-                    final record = selectedEvents[index];
-                    return _buildDismissibleTile(context, ref, record);
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDismissibleTile(BuildContext context, WidgetRef ref, FastingRecord record) {
-    final isCompleted = record.status == 'completed';
-
-    return Dismissible(
-      key: Key(record.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: AppSpacing.xxl),
-        color: context.colorScheme.error,
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      confirmDismiss: (direction) async {
-        return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Delete Record'),
-            content: const Text('Are you sure you want to delete this fasting record?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text('Delete', style: TextStyle(color: context.colorScheme.error)),
-              ),
-            ],
-          ),
         );
       },
-      onDismissed: (direction) {
-        ref.read(historyProvider.notifier).deleteRecord(record.id);
-        context.showSnack('Fasting record deleted.');
-      },
-      child: Card(
-        margin: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.sm,
+    );
+  }
+
+  Widget _buildHistoryCard(BuildContext context, WidgetRef ref, FastingRecord record) {
+    final theme = Theme.of(context);
+    final isCompleted = record.status == 'completed';
+
+    return AppCard.elevated(
+      padding: EdgeInsets.zero,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
         ),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: isCompleted
-                ? AppColors.success.withValues(alpha: 0.15)
-                : context.colorScheme.error.withValues(alpha: 0.15),
-            child: Icon(
-              isCompleted ? Icons.check_circle_outline : Icons.cancel_outlined,
-              color: isCompleted ? AppColors.success : context.colorScheme.error,
+        leading: Container(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: isCompleted
+                ? context.colors.success.withValues(alpha: 0.1)
+                : theme.colorScheme.error.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            isCompleted ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
+            color: isCompleted ? context.colors.success : theme.colorScheme.error,
+          ),
+        ),
+        title: Text(
+          record.planName,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Text(
+          '${DateFormat('MMM dd, yyyy').format(record.startTime)} • ${record.actualDuration.toReadable}',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete_outline_rounded),
+          color: theme.colorScheme.error,
+          onPressed: () => _confirmDelete(context, ref, record.id),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCalendarView(BuildContext context, WidgetRef ref, DateTime selectedDay) {
+    final theme = Theme.of(context);
+    final selectedRecord = _getRecordForDay(ref, selectedDay);
+
+    return SingleChildScrollView(
+      key: const ValueKey('calendar_view'),
+      padding: const EdgeInsets.all(AppSpacing.screenPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppCard.elevated(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: TableCalendar<FastingRecord>(
+              firstDay: DateTime.now().subtract(const Duration(days: 365)),
+              lastDay: DateTime.now().add(const Duration(days: 30)),
+              focusedDay: selectedDay,
+              selectedDayPredicate: (day) => day.isSameDay(selectedDay),
+              eventLoader: (day) => _getEventsForDay(ref, day),
+              calendarFormat: CalendarFormat.month,
+              headerStyle: const HeaderStyle(
+                formatButtonVisible: false,
+                titleCentered: true,
+              ),
+              calendarStyle: CalendarStyle(
+                todayDecoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.35),
+                  shape: BoxShape.circle,
+                ),
+                selectedDecoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                markerDecoration: BoxDecoration(
+                  color: context.colors.success,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              onDaySelected: (selected, focused) {
+                ref.read(selectedDayProvider.notifier).state = selected;
+              },
             ),
           ),
-          title: Text(
-            record.planName,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              Text(
-                '${DateFormat('MMM d, h:mm a').format(record.startTime)} → ${record.endTime != null ? DateFormat('h:mm a').format(record.endTime!) : '--:--'}',
-                style: context.textTheme.bodySmall,
+          const SizedBox(height: AppSpacing.lg),
+          if (selectedRecord != null) ...[
+            Text(
+              'Selected Date Log',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 2),
-              Text(
-                'Duration: ${record.actualDuration.toReadable}',
-                style: context.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: context.colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isCompleted
-                      ? AppColors.success.withValues(alpha: 0.15)
-                      : context.colorScheme.error.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
-                ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _buildHistoryCard(context, ref, selectedRecord),
+          ] else ...[
+            AppCard.outlined(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Center(
                 child: Text(
-                  record.status.toUpperCase(),
-                  style: TextStyle(
-                    color: isCompleted ? AppColors.success : context.colorScheme.error,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 10,
+                  'No log recorded for this date.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
+            ),
+          ],
+        ],
       ),
     );
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref, String id) async {
+    final confirm = await AppDialog.showConfirm(
+      context: context,
+      title: 'Delete Fast Log',
+      content: 'Are you sure you want to permanently delete this fasting record?',
+      isDestructive: true,
+    );
+
+    if (confirm == true) {
+      await ref.read(historyProviderNotifier.notifier).deleteRecord(id);
+      if (context.mounted) {
+        context.showSnack('Fasting record deleted');
+      }
+    }
+  }
+
+  List<FastingRecord> _getEventsForDay(WidgetRef ref, DateTime day) {
+    final records = ref.read(historyProvider).maybeWhen(
+          data: (data) => data,
+          orElse: () => <FastingRecord>[],
+        );
+    return records.where((r) => r.startTime.isSameDay(day)).toList();
+  }
+
+  FastingRecord? _getRecordForDay(WidgetRef ref, DateTime day) {
+    final events = _getEventsForDay(ref, day);
+    return events.isNotEmpty ? events.first : null;
   }
 }

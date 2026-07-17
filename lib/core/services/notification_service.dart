@@ -1,214 +1,123 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:fast_flow/features/fasting/models/fasting_schedule.dart';
-
-/// Manages local notifications for fasting reminders.
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:fast_flow/core/data/services/hive_service.dart';
+import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
 class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
 
-  final FlutterLocalNotificationsPlugin _plugin =
-      FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
 
-  static const _channelId = 'fastflow_fasting';
-  static const _channelName = 'Fasting Reminders';
-  static const _channelDesc = 'Notifications for fasting and eating windows';
-
-  /// Initialize the notification plugin.
   Future<void> init() async {
     tz.initializeTimeZones();
 
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
-    );
-
-    const darwinSettings = DarwinInitializationSettings(
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosInit = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
 
-    const settings = InitializationSettings(
-      android: androidSettings,
-      iOS: darwinSettings,
-      macOS: darwinSettings,
+    const initSettings = InitializationSettings(
+      android: androidInit,
+      iOS: iosInit,
     );
 
-    await _plugin.initialize(settings);
+    await _notifications.initialize(initSettings);
+
+    // Request permissions
+    await _notifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
   }
 
-  /// Request notification permissions (especially for Android 13+).
-  Future<bool> requestPermissions() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    if (android != null) {
-      final granted = await android.requestNotificationsPermission();
-      return granted ?? false;
+  Future<void> requestPermissions() async {
+    await _notifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
+  }
+
+  Future<void> scheduleScheduleNotifications(FastingSchedule schedule) async {
+    await _notifications.cancelAll();
+
+    for (int day = 1; day <= 7; day++) {
+      final daySched = schedule.getScheduleFor(day);
+
+      // Fasting start notification
+      await _scheduleDailyNotification(
+        id: day * 2 - 1,
+        title: 'Fasting Started',
+        body: 'Your fasting period has begun. Stay strong!',
+        hour: daySched.fastHour,
+        minute: daySched.fastMin,
+        weekday: day,
+      );
+
+      // Eating window start notification
+      await _scheduleDailyNotification(
+        id: day * 2,
+        title: 'Eating Window Opened',
+        body: 'Your eating window has started. Enjoy your meals!',
+        hour: daySched.eatHour,
+        minute: daySched.eatMin,
+        weekday: day,
+      );
     }
-    return true;
   }
 
-  /// Schedule a notification at a specific time.
-  Future<void> scheduleNotification({
+  Future<void> _scheduleDailyNotification({
     required int id,
     required String title,
     required String body,
-    required DateTime scheduledTime,
-  }) async {
-    try {
-      final tzTime = tz.TZDateTime.from(scheduledTime, tz.local);
-
-      if (tzTime.isBefore(tz.TZDateTime.now(tz.local))) return;
-
-      await _plugin.zonedSchedule(
-        id,
-        title,
-        body,
-        tzTime,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDesc,
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          iOS: DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
-    } catch (e) {
-      debugPrint('Failed to schedule notification: $e');
-    }
-  }
-
-  /// Schedule fasting start notification.
-  Future<void> scheduleFastingStart(DateTime time) async {
-    await scheduleNotification(
-      id: 100,
-      title: '🍽️ Time to start fasting!',
-      body: 'Your eating window has ended. Stay strong!',
-      scheduledTime: time,
-    );
-  }
-
-  /// Schedule eating window notification.
-  Future<void> scheduleEatingStart(DateTime time) async {
-    await scheduleNotification(
-      id: 101,
-      title: '🎉 Eating window is open!',
-      body: 'Great job completing your fast! Enjoy your meal.',
-      scheduledTime: time,
-    );
-  }
-
-  /// Schedule fasting end notification.
-  Future<void> scheduleFastingEnd(DateTime time) async {
-    await scheduleNotification(
-      id: 102,
-      title: '✅ Fasting complete!',
-      body: 'You\'ve reached your fasting goal. Well done!',
-      scheduledTime: time,
-    );
-  }
-
-  /// Schedule a daily reminder at the given hour and minute.
-  Future<void> scheduleDailyReminder({
     required int hour,
     required int minute,
+    required int weekday,
   }) async {
-    final now = tz.TZDateTime.now(tz.local);
-    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
-    if (scheduled.isBefore(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
-    }
-
-    await _plugin.zonedSchedule(
-      200,
-      '⏰ Daily Reminder',
-      'Don\'t forget your fasting plan today!',
-      scheduled,
+    await _notifications.zonedSchedule(
+      id,
+      title,
+      body,
+      _nextInstanceOfWeekday(weekday, hour, minute),
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDesc,
-          importance: Importance.defaultImportance,
-          priority: Priority.defaultPriority,
+          'fasting_schedule',
+          'Fasting Schedule',
+          channelDescription: 'Notifications for fasting and eating windows',
+          importance: Importance.high,
+          priority: Priority.high,
         ),
-        iOS: DarwinNotificationDetails(),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
       ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
     );
   }
 
-  /// Cancel a specific notification.
-  Future<void> cancel(int id) async {
-    await _plugin.cancel(id);
-  }
+  tz.TZDateTime _nextInstanceOfWeekday(int weekday, int hour, int minute) {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
 
-  /// Cancel all scheduled notifications.
-  Future<void> cancelAll() async {
-    await _plugin.cancelAll();
-  }
+    // Adjust to target weekday (1=Monday...7=Sunday)
+    int daysAhead = weekday - scheduledDate.weekday;
+    if (daysAhead <= 0) daysAhead += 7;
 
-  /// Schedule notifications for the next 14 days of the schedule.
-  Future<void> scheduleScheduleNotifications(FastingSchedule schedule) async {
-    try {
-      await cancelAll();
-      final now = DateTime.now();
-      // Schedule for the next 14 days
-      int idCounter = 1000;
-      for (int i = 0; i < 14; i++) {
-        final date = now.add(Duration(days: i));
-        final dateOnly = DateTime(date.year, date.month, date.day);
-        final daySched = schedule.getScheduleFor(dateOnly.weekday);
+    scheduledDate = scheduledDate.add(Duration(days: daysAhead));
 
-        final fastingTime = DateTime(
-          dateOnly.year,
-          dateOnly.month,
-          dateOnly.day,
-          daySched['fastHour']!,
-          daySched['fastMin']!,
-        );
-        final eatingTime = DateTime(
-          dateOnly.year,
-          dateOnly.month,
-          dateOnly.day,
-          daySched['eatHour']!,
-          daySched['eatMin']!,
-        );
-
-        if (fastingTime.isAfter(now)) {
-          await scheduleNotification(
-            id: idCounter++,
-            title: '🍽️ Fasting period started!',
-            body: 'Your fasting period has started. Stay hydrated!',
-            scheduledTime: fastingTime,
-          );
-        }
-        if (eatingTime.isAfter(now)) {
-          await scheduleNotification(
-            id: idCounter++,
-            title: '🎉 Eating window begun!',
-            body: 'Your eating window has begun. Eat mindfully.',
-            scheduledTime: eatingTime,
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Failed to schedule fasting schedule notifications: $e');
+    // If it's today but time has passed, schedule for next week
+    if (daysAhead == 0 && scheduledDate.isBefore(now)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 7));
     }
+
+    return scheduledDate;
+  }
+
+  Future<void> cancelAll() async {
+    await _notifications.cancelAll();
   }
 }
