@@ -18,9 +18,16 @@ class HistoryGenerator {
       daysAfter: 0,
     );
 
+    final deleted = HiveService.instance.settingsBox.get('deleted_sessions') as List?;
+    final deletedSet = deleted != null ? Set<String>.from(deleted.map((e) => e.toString())) : <String>{};
+
     for (final session in sessions) {
       final expectedStart = session.expectedStart;
       final expectedEnd = session.expectedEnd;
+      final sessionId = 'session_${expectedStart.millisecondsSinceEpoch}';
+
+      // Skip generating if this session was deleted by the user
+      if (deletedSet.contains(sessionId)) continue;
 
       // Only generate history for sessions that have completely finished
       if (expectedEnd.isBefore(now)) {
@@ -28,7 +35,7 @@ class HistoryGenerator {
         if (existing == null) {
           final durationMinutes = expectedEnd.difference(expectedStart).inMinutes;
           final record = FastingRecord(
-            id: '${DateTime.now().millisecondsSinceEpoch}_${expectedStart.millisecondsSinceEpoch}',
+            id: sessionId,
             planName: 'Daily Schedule',
             fastingMinutes: durationMinutes,
             eatingMinutes: (24 * 60) - durationMinutes,

@@ -62,7 +62,7 @@ class FastingStateNotifier extends Notifier<FastingState?> {
     } else {
       final duration = currentState.activeWindowEnd.difference(expectedStart).inMinutes;
       final record = FastingRecord(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: 'session_${expectedStart.millisecondsSinceEpoch}',
         planName: 'Daily Schedule',
         fastingMinutes: duration,
         eatingMinutes: 24 * 60 - duration,
@@ -83,14 +83,17 @@ class FastingStateNotifier extends Notifier<FastingState?> {
     String? note,
     String? reason,
   }) {
-    final existing = HiveService.instance.fastingRecordsBox.get(id);
+    final existing = HiveService.instance.fastingRecordsBox.get(id) as FastingRecord?;
     if (existing != null) {
       existing.startTime = startTime;
       existing.endTime = endTime;
       existing.status = status;
       existing.note = note;
       existing.reason = reason;
+      existing.fastingMinutes = endTime.difference(startTime).inMinutes;
+      existing.eatingMinutes = 24 * 60 - existing.fastingMinutes;
       HiveService.instance.saveFastingRecord(existing);
+      
       final engine = ref.read(fastingEngineProvider);
       engine.onRecordChanged();
     }

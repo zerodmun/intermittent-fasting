@@ -14,6 +14,8 @@ import '../domain/entities/fasting_record.dart';
 import '../domain/entities/fasting_schedule.dart';
 import '../domain/entities/fasting_state.dart';
 import '../presentation/providers/fasting_providers.dart';
+import '../../../core/providers/app_providers.dart';
+import '../../statistics/providers/statistics_provider.dart';
 import '../../../shared/widgets/animated_progress_ring.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_button.dart';
@@ -672,18 +674,21 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
             AppButton.primary(
               label: 'Log as Completed',
               onPressed: () {
+                final startTime = DateTime(day.year, day.month, day.day, daySched.fastHour, daySched.fastMin);
                 final record = FastingRecord(
-                  id: const Uuid().v4(),
+                  id: 'session_${startTime.millisecondsSinceEpoch}',
                   planName: '16:8 Fast',
                   fastingMinutes: 16 * 60,
                   eatingMinutes: 8 * 60,
-                  startTime: DateTime(day.year, day.month, day.day, daySched.fastHour, daySched.fastMin),
+                  startTime: startTime,
                   endTime: DateTime(day.year, day.month, day.day, daySched.eatHour, daySched.eatMin),
                   status: 'completed',
                   note: noteController.text,
                 );
 
                 HiveService.instance.saveFastingRecord(record);
+                ref.invalidate(fastingRecordsProvider);
+                ref.invalidate(statisticsProvider);
                 notifier.refresh();
                 Navigator.of(context).pop();
                 context.showSnack('Day logged as Completed', isSuccess: true);
@@ -697,47 +702,176 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
 
   void _editManualLogSheet(BuildContext context, FastingRecord existing, FastingStateNotifier notifier) {
     final noteController = TextEditingController(text: existing.note ?? '');
+    DateTime startTime = existing.startTime;
+    DateTime endTime = existing.endTime ?? existing.startTime.add(Duration(minutes: existing.fastingMinutes));
+    String status = existing.status;
+
+    Future<DateTime?> selectDateTime(BuildContext ctx, DateTime initial) async {
+      final date = await showDatePicker(
+        context: ctx,
+        initialDate: initial,
+        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+        lastDate: DateTime.now().add(const Duration(days: 30)),
+      );
+      if (date == null) return null;
+
+      if (ctx.mounted) {
+        final time = await showTimePicker(
+          context: ctx,
+          initialTime: TimeOfDay.fromDateTime(initial),
+        );
+        if (time == null) return null;
+        return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      }
+      return null;
+    }
 
     AppBottomSheet.show(
       context: context,
       title: 'Edit Day Log',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AppInput(
-            label: 'Note',
-            controller: noteController,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          AppButton.primary(
-            label: 'Save Changes',
-            onPressed: () {
-              existing.note = noteController.text;
-              HiveService.instance.saveFastingRecord(existing);
-              notifier.refresh();
-              Navigator.of(context).pop();
-              context.showSnack('Log updated successfully', isSuccess: true);
-            },
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AppButton.outlined(
-            label: 'Delete Log',
-            onPressed: () async {
-              final confirm = await AppDialog.showConfirm(
-                context: context,
-                title: 'Delete Log',
-                content: 'Are you sure you want to delete this fasting record?',
-                isDestructive: true,
-              );
-              if (confirm == true && context.mounted) {
-                await HiveService.instance.deleteFastingRecord(existing.id);
-                notifier.refresh();
-                Navigator.of(context).pop();
-                context.showSnack('Fasting record deleted');
-              }
-            },
-          ),
-        ],
+      child: StatefulBuilder(
+        builder: (context, setState) {
+          final theme = Theme.of(context);
+          final colorScheme = theme.colorScheme;
+          final duration = endTime.difference(startTime);
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Start Date Time
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Start Time:', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  TextButton.icon(
+                    onPressed: () async {
+                      final dt = await selectDateTime(context, startTime);
+                      if (dt != null) {
+                        setState(() {
+                          startTime = dt;
+                          if (endTime.isBefore(startTime)) {
+                            endTime = startTime.add(const Duration(hours: 16));
+                          }
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.calendar_today_rounded, size: 16),
+                    label: Text(DateFormat('MMM dd, HH:mm').format(startTime)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // End Date Time
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('End Time:', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  TextButton.icon(
+                    onPressed: () async {
+                      final dt = await selectDateTime(context, endTime);
+                      if (dt != null) {
+                        setState(() {
+                          endTime = dt;
+                          if (endTime.isBefore(startTime)) {
+                            startTime = endTime.subtract(const Duration(hours: 16));
+                          }
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.calendar_today_rounded, size: 16),
+                    label: Text(DateFormat('MMM dd, HH:mm').format(endTime)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // Calculated Duration info
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Calculated Fast:', style: theme.textTheme.bodySmall),
+                    Text(
+                      duration.inMinutes % 60 == 0
+                          ? '${duration.inHours}h'
+                          : '${duration.inHours}h ${duration.inMinutes % 60}m',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // Status Dropdown
+              DropdownButtonFormField<String>(
+                value: status,
+                decoration: const InputDecoration(
+                  labelText: 'Fasting Status',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                  DropdownMenuItem(value: 'skipped', child: Text('Skipped')),
+                  DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      status = val;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              AppInput(
+                label: 'Note',
+                controller: noteController,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              AppButton.primary(
+                label: 'Save Changes',
+                onPressed: () {
+                  notifier.editFastingRecord(
+                    id: existing.id,
+                    startTime: startTime,
+                    endTime: endTime,
+                    status: status,
+                    note: noteController.text,
+                    reason: existing.reason,
+                  );
+                  Navigator.of(context).pop();
+                  context.showSnack('Log updated successfully', isSuccess: true);
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              AppButton.outlined(
+                label: 'Delete Log',
+                onPressed: () async {
+                  final confirm = await AppDialog.showConfirm(
+                    context: context,
+                    title: 'Delete Log',
+                    content: 'Are you sure you want to delete this fasting record?',
+                    isDestructive: true,
+                  );
+                  if (confirm == true && context.mounted) {
+                    await HiveService.instance.deleteFastingRecord(existing.id);
+                    notifier.refresh();
+                    Navigator.of(context).pop();
+                    context.showSnack('Fasting record deleted');
+                  }
+                },
+              ),
+            ],
+          );
+        },
       ),
     );
   }

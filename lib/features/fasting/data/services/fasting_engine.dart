@@ -148,12 +148,19 @@ class FastingEngine {
 
   /// Retained for compatibility but updated to search the timeline-based records.
   FastingRecord? getRecordForSession(DateTime expectedStart) {
+    // 1. Direct key match (deterministic ID format)
+    final key = 'session_${expectedStart.millisecondsSinceEpoch}';
+    final recordByKey = HiveService.instance.fastingRecordsBox.get(key) as FastingRecord?;
+    if (recordByKey != null) {
+      return recordByKey;
+    }
+
     final records = HiveService.instance.allFastingRecords;
     FastingRecord? bestMatch;
     int minDiffMs = 999999999999; // large number
 
     for (final r in records) {
-      // 1. Direct calendar day match
+      // 2. Direct calendar day match
       final sameDay = r.startTime.year == expectedStart.year &&
           r.startTime.month == expectedStart.month &&
           r.startTime.day == expectedStart.day;
@@ -161,7 +168,7 @@ class FastingEngine {
         return r;
       }
 
-      // 2. Proximity match within 12 hours
+      // 3. Proximity match within 12 hours
       final diffMs = (r.startTime.millisecondsSinceEpoch - expectedStart.millisecondsSinceEpoch).abs();
       if (diffMs < 12 * 60 * 60 * 1000 && diffMs < minDiffMs) {
         minDiffMs = diffMs;

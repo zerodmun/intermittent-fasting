@@ -135,6 +135,12 @@ class HiveService {
   }
 
   Future<void> deleteFastingRecord(String id) async {
+    final deleted = settingsBox.get('deleted_sessions') as List?;
+    final updated = deleted != null ? List<String>.from(deleted.map((e) => e.toString())) : <String>[];
+    if (!updated.contains(id)) {
+      updated.add(id);
+      await settingsBox.put('deleted_sessions', updated);
+    }
     await fastingRecordsBox.delete(id);
   }
 

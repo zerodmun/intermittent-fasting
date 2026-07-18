@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fast_flow/core/data/services/hive_service.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
+import 'package:fast_flow/features/statistics/providers/statistics_provider.dart';
 
 final historyProvider = FutureProvider<List<FastingRecord>>((ref) async {
   return ref.watch(fastingRecordsProvider.future);
@@ -21,11 +22,15 @@ class HistoryNotifier extends Notifier<List<FastingRecord>> {
 
   Future<void> deleteRecord(String id) async {
     await HiveService.instance.deleteFastingRecord(id);
+    ref.invalidate(fastingRecordsProvider);
+    ref.invalidate(statisticsProvider);
     refresh();
   }
 
   Future<void> saveRecord(FastingRecord record) async {
     await HiveService.instance.saveFastingRecord(record);
+    ref.invalidate(fastingRecordsProvider);
+    ref.invalidate(statisticsProvider);
     refresh();
   }
 }

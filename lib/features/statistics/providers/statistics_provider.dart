@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fast_flow/core/helpers/streak_calculator.dart';
 import 'package:fast_flow/core/data/services/hive_service.dart';
+import 'package:fast_flow/core/providers/app_providers.dart';
 
 class StatsData {
   final int currentStreak;
@@ -27,7 +28,11 @@ class StatsData {
 }
 
 final statisticsProvider = Provider<StatsData>((ref) {
-  final records = HiveService.instance.allFastingRecords;
+  final recordsAsync = ref.watch(fastingRecordsProvider);
+  final records = recordsAsync.maybeWhen(
+    data: (data) => data,
+    orElse: () => HiveService.instance.allFastingRecords,
+  );
   final streak = StreakCalculator.calculate(records);
 
   final completed = records.where((r) => r.status == 'completed').toList();

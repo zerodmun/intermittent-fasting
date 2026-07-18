@@ -9,6 +9,7 @@ import '../../../core/extensions/context_extensions.dart';
 import '../../../core/extensions/date_extensions.dart';
 import '../../../core/extensions/duration_extensions.dart';
 import '../../fasting/domain/entities/fasting_record.dart';
+import '../../fasting/presentation/providers/fasting_providers.dart';
 import '../providers/history_providers.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/app_card.dart';
@@ -16,6 +17,8 @@ import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/animated_list_item.dart';
 import '../../../shared/widgets/shimmer_loading.dart';
+import '../../../shared/widgets/app_bottom_sheet.dart';
+import '../../../shared/widgets/app_input.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -98,6 +101,7 @@ class HistoryScreen extends ConsumerWidget {
     return AppCard.elevated(
       padding: EdgeInsets.zero,
       child: ListTile(
+        onTap: () => _editManualLogSheet(context, record, ref),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.xs,
@@ -233,5 +237,181 @@ class HistoryScreen extends ConsumerWidget {
   FastingRecord? _getRecordForDay(WidgetRef ref, DateTime day) {
     final events = _getEventsForDay(ref, day);
     return events.isNotEmpty ? events.first : null;
+  }
+
+  void _editManualLogSheet(BuildContext context, FastingRecord existing, WidgetRef ref) {
+    final noteController = TextEditingController(text: existing.note ?? '');
+    DateTime startTime = existing.startTime;
+    DateTime endTime = existing.endTime ?? existing.startTime.add(Duration(minutes: existing.fastingMinutes));
+    String status = existing.status;
+
+    Future<DateTime?> selectDateTime(BuildContext ctx, DateTime initial) async {
+      final date = await showDatePicker(
+        context: ctx,
+        initialDate: initial,
+        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+        lastDate: DateTime.now().add(const Duration(days: 30)),
+      );
+      if (date == null) return null;
+
+      if (ctx.mounted) {
+        final time = await showTimePicker(
+          context: ctx,
+          initialTime: TimeOfDay.fromDateTime(initial),
+        );
+        if (time == null) return null;
+        return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      }
+      return null;
+    }
+
+    AppBottomSheet.show(
+      context: context,
+      title: 'Edit Day Log',
+      child: StatefulBuilder(
+        builder: (context, setState) {
+          final theme = Theme.of(context);
+          final colorScheme = theme.colorScheme;
+          final duration = endTime.difference(startTime);
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Start Date Time
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Start Time:', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  TextButton.icon(
+                    onPressed: () async {
+                      final dt = await selectDateTime(context, startTime);
+                      if (dt != null) {
+                        setState(() {
+                          startTime = dt;
+                          if (endTime.isBefore(startTime)) {
+                            endTime = startTime.add(const Duration(hours: 16));
+                          }
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.calendar_today_rounded, size: 16),
+                    label: Text(DateFormat('MMM dd, HH:mm').format(startTime)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // End Date Time
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('End Time:', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  TextButton.icon(
+                    onPressed: () async {
+                      final dt = await selectDateTime(context, endTime);
+                      if (dt != null) {
+                        setState(() {
+                          endTime = dt;
+                          if (endTime.isBefore(startTime)) {
+                            startTime = endTime.subtract(const Duration(hours: 16));
+                          }
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.calendar_today_rounded, size: 16),
+                    label: Text(DateFormat('MMM dd, HH:mm').format(endTime)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // Calculated Duration info
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Calculated Fast:', style: theme.textTheme.bodySmall),
+                    Text(
+                      duration.inMinutes % 60 == 0
+                          ? '${duration.inHours}h'
+                          : '${duration.inHours}h ${duration.inMinutes % 60}m',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // Status Dropdown
+              DropdownButtonFormField<String>(
+                value: status,
+                decoration: const InputDecoration(
+                  labelText: 'Fasting Status',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                  DropdownMenuItem(value: 'skipped', child: Text('Skipped')),
+                  DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      status = val;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              AppInput(
+                label: 'Note',
+                controller: noteController,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              AppButton.primary(
+                label: 'Save Changes',
+                onPressed: () {
+                  ref.read(fastingStateNotifierProvider.notifier).editFastingRecord(
+                    id: existing.id,
+                    startTime: startTime,
+                    endTime: endTime,
+                    status: status,
+                    note: noteController.text,
+                    reason: existing.reason,
+                  );
+                  ref.read(historyProviderNotifier.notifier).refresh();
+                  Navigator.of(context).pop();
+                  context.showSnack('Log updated successfully', isSuccess: true);
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              AppButton.outlined(
+                label: 'Delete Log',
+                onPressed: () async {
+                  final confirm = await AppDialog.showConfirm(
+                    context: context,
+                    title: 'Delete Log',
+                    content: 'Are you sure you want to delete this fasting record?',
+                    isDestructive: true,
+                  );
+                  if (confirm == true && context.mounted) {
+                    await ref.read(historyProviderNotifier.notifier).deleteRecord(existing.id);
+                    Navigator.of(context).pop();
+                    context.showSnack('Fasting record deleted');
+                  }
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
