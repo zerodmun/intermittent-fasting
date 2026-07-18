@@ -8,6 +8,8 @@ class StatCard extends StatelessWidget {
   final String value;
   final Color color;
   final Widget? trailing;
+  final String? subtitle;
+  final VoidCallback? onTap;
 
   const StatCard({
     required this.icon,
@@ -15,6 +17,8 @@ class StatCard extends StatelessWidget {
     required this.value,
     required this.color,
     this.trailing,
+    this.subtitle,
+    this.onTap,
     super.key,
   });
 
@@ -24,6 +28,7 @@ class StatCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return AppCard.elevated(
+      onTap: onTap,
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,6 +65,18 @@ class StatCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              subtitle!,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 10,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ],
       ),
     );

@@ -88,10 +88,14 @@ class MainActivity : FlutterActivity() {
         val notificationEnabled = data["pref_notification_enabled"] as? Boolean ?: true
         val serviceIntent = Intent(this, FastingForegroundService::class.java)
 
-        if (notificationEnabled) {
-            ContextCompat.startForegroundService(this, serviceIntent)
-        } else {
-            stopService(serviceIntent)
+        try {
+            if (notificationEnabled) {
+                ContextCompat.startForegroundService(this, serviceIntent)
+            } else {
+                stopService(serviceIntent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }

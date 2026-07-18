@@ -56,16 +56,20 @@ class WidgetSyncService {
   WidgetSettings get settings => _settings;
 
   Future<void> initialize() async {
-    final prefs = await SharedPreferences.getInstance();
-    _settings = WidgetSettings(
-      widgetEnabled: prefs.getBool('widgetEnabled') ?? true,
-      notificationEnabled: prefs.getBool('notificationEnabled') ?? true,
-      liveCountdownEnabled: prefs.getBool('liveCountdownEnabled') ?? true,
-      progressRingEnabled: prefs.getBool('progressRingEnabled') ?? true,
-      bodyFatEnabled: prefs.getBool('bodyFatEnabled') ?? true,
-      weightEnabled: prefs.getBool('weightEnabled') ?? true,
-    );
-    await syncToNative();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _settings = WidgetSettings(
+        widgetEnabled: prefs.getBool('widgetEnabled') ?? true,
+        notificationEnabled: prefs.getBool('notificationEnabled') ?? true,
+        liveCountdownEnabled: prefs.getBool('liveCountdownEnabled') ?? true,
+        progressRingEnabled: prefs.getBool('progressRingEnabled') ?? true,
+        bodyFatEnabled: prefs.getBool('bodyFatEnabled') ?? true,
+        weightEnabled: prefs.getBool('weightEnabled') ?? true,
+      );
+      await syncToNative();
+    } catch (e, stackTrace) {
+      print('WidgetSyncService: Initialization failed: $e\n$stackTrace');
+    }
   }
 
   Future<void> updateSettings(WidgetSettings newSettings) async {

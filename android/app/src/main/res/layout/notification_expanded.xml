@@ -2,30 +2,78 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/widget_background">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Fomo IF" />
+    <!-- Header Section -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
 
-    <TextView
-        android:id="@+id/notification_expanded_status"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="FASTING" />
+        <!-- Stage Title / App name -->
+        <TextView
+            android:id="@+id/notification_expanded_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="16:8 Fast"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="12sp"
+            android:fontFamily="sans-serif-medium"
+            android:textStyle="bold"
+            android:textAllCaps="true" />
 
+        <!-- Current Status Label (Fasting / Eating) -->
+        <TextView
+            android:id="@+id/notification_expanded_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:text="🌙 FASTING"
+            android:textColor="@color/state_fasting"
+            android:textSize="12sp"
+            android:fontFamily="sans-serif-medium"
+            android:textStyle="bold" />
+    </RelativeLayout>
+
+    <!-- Prominent Time Remaining -->
     <TextView
         android:id="@+id/notification_expanded_timer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="04:20:00" />
+        android:layout_marginTop="8dp"
+        android:text="06:42:15 remaining"
+        android:textColor="@color/widget_text_primary"
+        android:textSize="22sp"
+        android:fontFamily="monospace"
+        android:textStyle="bold" />
 
-    <ProgressBar
-        android:id="@+id/notification_expanded_progress"
-        style="@android:style/Widget.ProgressBar.Horizontal"
+    <!-- Progress Line & Percentage -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:max="100" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="12dp">
+
+        <ProgressBar
+            android:id="@+id/notification_expanded_progress"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="4dp"
+            android:max="100"
+            android:progress="62" />
+
+        <TextView
+            android:id="@+id/notification_expanded_percentage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="62%"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="12sp"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
 
 </LinearLayout>

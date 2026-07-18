@@ -3,16 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import '../../../core/constants/app_spacing.dart';
-import '../../../core/constants/app_animations.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../core/extensions/duration_extensions.dart';
-import '../providers/statistics_provider.dart';
+import 'package:fast_flow/core/providers/app_providers.dart';
+import 'package:fast_flow/core/data/services/hive_service.dart';
+import 'package:fast_flow/features/food_scanner/providers/food_logs_provider.dart';
+import 'package:fast_flow/features/statistics/screens/nutrition_details_screen.dart';
+import 'package:fast_flow/features/statistics/screens/food_intake_summary_screen.dart';
+import 'package:fast_flow/features/statistics/providers/statistics_provider.dart';
 import '../../../shared/widgets/animated_progress_ring.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/stat_card.dart';
 import '../../../shared/widgets/section_header.dart';
-import '../../../shared/widgets/shimmer_loading.dart';
 
 class StatisticsScreen extends ConsumerWidget {
   const StatisticsScreen({super.key});
@@ -20,21 +23,53 @@ class StatisticsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(statisticsProvider);
+    final profileAsync = ref.watch(userProfileProvider);
+    final foodLogs = ref.watch(foodLogsProvider);
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
-    if (stats.totalSessions == 0) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Analytics'),
-        ),
-        body: const EmptyState(
-          icon: Icons.analytics_outlined,
-          title: 'Analytics Empty',
-          subtitle: 'Complete your first fast to display analytics graphs.',
-        ),
-      );
+    // Calculate Daily Calorie Requirement
+    final profile = profileAsync.maybeWhen(
+      data: (p) => p,
+      orElse: () => null,
+    );
+
+    int dailyCalories = 2000; // default fallback
+    if (profile != null) {
+      final isMale = profile.gender.toLowerCase() == 'male';
+      final bmr = isMale
+          ? 10.0 * profile.weightKg + 6.25 * profile.heightCm - 5.0 * profile.ageYears + 5.0
+          : 10.0 * profile.weightKg + 6.25 * profile.heightCm - 5.0 * profile.ageYears - 161.0;
+
+      final activity = HiveService.instance.getSetting<String>('pref_activity_level') ?? 'Lightly Active';
+      double multiplier = 1.375;
+      switch (activity) {
+        case 'Sedentary': multiplier = 1.2; break;
+        case 'Lightly Active': multiplier = 1.375; break;
+        case 'Moderately Active': multiplier = 1.55; break;
+        case 'Very Active': multiplier = 1.725; break;
+        case 'Extra Active': multiplier = 1.9; break;
+      }
+
+      final tdee = bmr * multiplier;
+      String defaultGoal = 'Maintain Weight';
+      if (profile.goalWeightKg < profile.weightKg) {
+        defaultGoal = 'Lose Weight';
+      } else if (profile.goalWeightKg > profile.weightKg) {
+        defaultGoal = 'Gain Weight';
+      }
+      final goal = HiveService.instance.getSetting<String>('pref_weight_goal') ?? defaultGoal;
+      double adjustment = 0.0;
+      if (goal == 'Lose Weight') {
+        adjustment = -500.0;
+      } else if (goal == 'Gain Weight') {
+        adjustment = 500.0;
+      }
+
+      dailyCalories = (tdee + adjustment).clamp(1200.0, 5000.0).round();
     }
+
+    // Calculate Total Calories Consumed
+    final totalFoodCalories = foodLogs.fold<double>(0.0, (sum, log) => sum + log.calories).round();
 
     return Scaffold(
       appBar: AppBar(
@@ -43,6 +78,8 @@ class StatisticsScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(statisticsProvider);
+          ref.invalidate(userProfileProvider);
+          ref.invalidate(foodLogsProvider);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -50,13 +87,42 @@ class StatisticsScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildStatsGrid(context, stats, theme),
+              _buildStatsGrid(context, stats, dailyCalories, totalFoodCalories, theme),
               const SectionHeader(title: 'Completion Rate'),
-              _buildCompletionCard(context, stats),
+              stats.totalSessions == 0
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding, vertical: AppSpacing.md),
+                      child: EmptyState(
+                        icon: Icons.analytics_outlined,
+                        title: 'No fasting data',
+                        subtitle: 'Complete a fasting session to see success rate.',
+                      ),
+                    )
+                  : _buildCompletionCard(context, stats),
               const SectionHeader(title: 'This Week'),
-              _buildWeeklyChart(context, stats),
+              stats.totalSessions == 0
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding, vertical: AppSpacing.md),
+                      child: Center(
+                        child: Text(
+                          'No weekly data logged.',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    )
+                  : _buildWeeklyChart(context, stats),
               const SectionHeader(title: 'Monthly Trend'),
-              _buildMonthlyChart(context, stats),
+              stats.totalSessions == 0
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding, vertical: AppSpacing.md),
+                      child: Center(
+                        child: Text(
+                          'No monthly trend logged.',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    )
+                  : _buildMonthlyChart(context, stats),
             ],
           ),
         ),
@@ -64,7 +130,13 @@ class StatisticsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsGrid(BuildContext context, StatsData stats, ThemeData theme) {
+  Widget _buildStatsGrid(
+    BuildContext context,
+    StatsData stats,
+    int dailyCalories,
+    int totalFoodCalories,
+    ThemeData theme,
+  ) {
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.screenPadding),
       child: GridView.count(
@@ -73,31 +145,49 @@ class StatisticsScreen extends ConsumerWidget {
         physics: const NeverScrollableScrollPhysics(),
         crossAxisSpacing: AppSpacing.md,
         mainAxisSpacing: AppSpacing.md,
-        childAspectRatio: 1.35,
+        childAspectRatio: 1.15,
         children: [
           StatCard(
             icon: Icons.local_fire_department_rounded,
-            label: 'Current Streak',
-            value: '${stats.currentStreak} days',
-            color: context.colors.eatingActive,
+            label: 'Daily Calories',
+            value: '$dailyCalories kcal',
+            subtitle: 'Recommended daily intake',
+            color: theme.colorScheme.primary,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NutritionDetailsScreen(),
+                ),
+              );
+            },
           ),
           StatCard(
-            icon: Icons.emoji_events_rounded,
-            label: 'Longest Streak',
-            value: '${stats.longestStreak} days',
-            color: context.colors.warning,
+            icon: Icons.restaurant_menu_rounded,
+            label: 'Total Calories Consumed',
+            value: '$totalFoodCalories kcal',
+            subtitle: 'From Food Scanner',
+            color: Colors.orangeAccent,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const FoodIntakeSummaryScreen(),
+                ),
+              );
+            },
           ),
           StatCard(
             icon: Icons.timer_outlined,
             label: 'Avg Duration',
             value: Duration(minutes: stats.averageDurationMinutes.round()).toReadable,
-            color: theme.colorScheme.primary,
+            color: theme.colorScheme.secondary,
           ),
           StatCard(
             icon: Icons.hourglass_empty_rounded,
             label: 'Total Fasted',
             value: '${stats.totalFastingHours.toStringAsFixed(1)}h',
-            color: context.colors.success,
+            color: theme.colorScheme.tertiary,
           ),
         ],
       ),

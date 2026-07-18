@@ -21,6 +21,7 @@ class HiveService {
   static const String _weightEntriesBox = 'weight_entries';
   static const String _settingsBox = 'settings';
   static const String _activeSessionBox = 'active_session';
+  static const String _foodLogsBox = 'food_logs';
 
   late Box<UserProfile> userProfileBox;
   late Box<FastingSchedule> fastingScheduleBox;
@@ -28,25 +29,79 @@ class HiveService {
   late Box<WeightEntry> weightEntriesBox;
   late Box settingsBox;
   late Box activeSessionBox;
+  late Box foodLogsBox;
 
-  /// Initialize Hive and open all boxes
+  /// Initialize Hive and open all boxes safely
   Future<void> init() async {
-    await Hive.initFlutter();
+    try {
+      await Hive.initFlutter();
+    } catch (e) {
+      print('HiveService: initFlutter failed: $e');
+    }
 
-    // Register adapters
-    Hive.registerAdapter(UserProfileAdapter());
-    Hive.registerAdapter(FastingScheduleAdapter());
-    Hive.registerAdapter(DailyScheduleAdapter());
-    Hive.registerAdapter(FastingRecordAdapter());
-    Hive.registerAdapter(WeightEntryAdapter());
+    // Register adapters safely to avoid duplicate registration errors
+    _registerAdapterSafe(UserProfileAdapter());
+    _registerAdapterSafe(FastingScheduleAdapter());
+    _registerAdapterSafe(DailyScheduleAdapter());
+    _registerAdapterSafe(FastingRecordAdapter());
+    _registerAdapterSafe(WeightEntryAdapter());
 
-    // Open boxes
-    userProfileBox = await Hive.openBox<UserProfile>(_userProfileBox);
-    fastingScheduleBox = await Hive.openBox<FastingSchedule>(_fastingScheduleBox);
-    fastingRecordsBox = await Hive.openBox<FastingRecord>(_fastingRecordsBox);
-    weightEntriesBox = await Hive.openBox<WeightEntry>(_weightEntriesBox);
-    settingsBox = await Hive.openBox(_settingsBox);
-    activeSessionBox = await Hive.openBox(_activeSessionBox);
+    // Open all boxes concurrently to optimize startup time
+    final opened = await Future.wait([
+      _openBoxWithRecoveryAndFallback<UserProfile>(_userProfileBox),
+      _openBoxWithRecoveryAndFallback<FastingSchedule>(_fastingScheduleBox),
+      _openBoxWithRecoveryAndFallback<FastingRecord>(_fastingRecordsBox),
+      _openBoxWithRecoveryAndFallback<WeightEntry>(_weightEntriesBox),
+      _openBoxWithRecoveryAndFallback(_settingsBox),
+      _openBoxWithRecoveryAndFallback(_activeSessionBox),
+      _openBoxWithRecoveryAndFallback(_foodLogsBox),
+    ]);
+
+    userProfileBox = opened[0] as Box<UserProfile>;
+    fastingScheduleBox = opened[1] as Box<FastingSchedule>;
+    fastingRecordsBox = opened[2] as Box<FastingRecord>;
+    weightEntriesBox = opened[3] as Box<WeightEntry>;
+    settingsBox = opened[4];
+    activeSessionBox = opened[5];
+    foodLogsBox = opened[6];
+  }
+
+  void _registerAdapterSafe<T>(TypeAdapter<T> adapter) {
+    try {
+      if (!Hive.isAdapterRegistered(adapter.typeId)) {
+        Hive.registerAdapter(adapter);
+      }
+    } catch (e) {
+      print('HiveService: Failed to register adapter ${adapter.runtimeType}: $e');
+    }
+  }
+
+  Future<Box<T>> _openBoxWithRecoveryAndFallback<T>(String name) async {
+    try {
+      return await Hive.openBox<T>(name);
+    } catch (e) {
+      print('HiveService: Error opening box "$name": $e. Attempting recovery via deletion...');
+      try {
+        await Hive.deleteBoxFromDisk(name);
+        return await Hive.openBox<T>(name);
+      } catch (deletionError) {
+        print('HiveService: Deletion recovery failed for box "$name": $deletionError. Trying temporary path...');
+        try {
+          final tempDir = await getTemporaryDirectory();
+          return await Hive.openBox<T>('${name}_temp', path: tempDir.path);
+        } catch (tempDirError) {
+          print('HiveService: Temp path recovery failed for box "$name": $tempDirError. Trying unique fallback box...');
+          try {
+            final tempDir = await getTemporaryDirectory();
+            final uniqueName = '${name}_fallback_${DateTime.now().millisecondsSinceEpoch}';
+            return await Hive.openBox<T>(uniqueName, path: tempDir.path);
+          } catch (fallbackError) {
+            print('HiveService: Critical failure. Fallback box failed for "$name": $fallbackError. Rethrowing.');
+            rethrow;
+          }
+        }
+      }
+    }
   }
 
   // ── User Profile ──
@@ -285,6 +340,25 @@ class HiveService {
     }
   }
 
+  // ── Food Logs ──
+
+  List<Map<String, dynamic>> get allFoodLogs {
+    try {
+      return foodLogsBox.values.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (e) {
+      print('HiveService: Error reading food logs: $e');
+      return [];
+    }
+  }
+
+  Future<void> saveFoodLog(String id, Map<String, dynamic> entry) async {
+    await foodLogsBox.put(id, entry);
+  }
+
+  Future<void> deleteFoodLog(String id) async {
+    await foodLogsBox.delete(id);
+  }
+
   /// Clear all data
   Future<void> resetAll() async {
     await userProfileBox.clear();
@@ -293,5 +367,6 @@ class HiveService {
     await weightEntriesBox.clear();
     await settingsBox.clear();
     await activeSessionBox.clear();
+    await foodLogsBox.clear();
   }
 }

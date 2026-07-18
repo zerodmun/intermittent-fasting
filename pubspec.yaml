@@ -40,6 +40,7 @@ flutter:
   assets:
     - assets/illustrations/
     - assets/branding/
+    - assets/google_fonts/
 
 flutter_launcher_icons:
   android: "launcher_icon"

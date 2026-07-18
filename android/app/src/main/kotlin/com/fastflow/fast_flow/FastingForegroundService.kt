@@ -106,165 +106,174 @@ class FastingForegroundService : Service() {
     }
 
     private fun updateNotificationAndWidgets() {
-        val prefs = getSharedPreferences("FastingWidgetPrefs", Context.MODE_PRIVATE)
-        val status = prefs.getString("status", "COMPLETED") ?: "COMPLETED"
-        val startTimeMs = prefs.getLong("start_time_ms", 0L)
-        val endTimeMs = prefs.getLong("end_time_ms", 0L)
-        val nextTransitionMs = prefs.getLong("next_transition_ms", 0L)
-        val streak = prefs.getInt("current_streak", 0)
+        try {
+            val prefs = getSharedPreferences("FastingWidgetPrefs", Context.MODE_PRIVATE)
+            val status = prefs.getString("status", "COMPLETED") ?: "COMPLETED"
+            val startTimeMs = prefs.getLong("start_time_ms", 0L)
+            val endTimeMs = prefs.getLong("end_time_ms", 0L)
+            val nextTransitionMs = prefs.getLong("next_transition_ms", 0L)
+            val streak = prefs.getInt("current_streak", 0)
 
-        val weight = prefs.getFloat("latest_weight", 0f)
-        val bodyFat = prefs.getFloat("latest_body_fat", 0f)
+            val weight = prefs.getFloat("latest_weight", 0f)
+            val bodyFat = prefs.getFloat("latest_body_fat", 0f)
 
-        val notificationEnabled = prefs.getBoolean("pref_notification_enabled", true)
-        val countdownEnabled = prefs.getBoolean("pref_countdown_enabled", true)
+            val notificationEnabled = prefs.getBoolean("pref_notification_enabled", true)
+            val countdownEnabled = prefs.getBoolean("pref_countdown_enabled", true)
 
-        if (!notificationEnabled) {
-            stopSelf()
-            return
+            if (!notificationEnabled) {
+                stopSelf()
+                return
+            }
+
+            val label = WidgetHelper.getStatusLabel(status)
+            val color = WidgetHelper.getStatusColor(this, status)
+
+            val now = System.currentTimeMillis()
+            val totalSec = (endTimeMs - startTimeMs) / 1000
+            val elapsedSec = (now - startTimeMs) / 1000
+            val remainingSec = (endTimeMs - now) / 1000
+
+            val progress = if (totalSec > 0) {
+                val p = elapsedSec.toFloat() / totalSec.toFloat()
+                p.coerceIn(0f, 1f)
+            } else 0f
+
+            val elapsedStr = if (elapsedSec > 0) {
+                val hrs = elapsedSec / 3600
+                val mins = (elapsedSec % 3600) / 60
+                "${hrs}h ${mins}m"
+            } else {
+                "0h 0m"
+            }
+
+            val remainingStr = if (remainingSec > 0) {
+                val hrs = remainingSec / 3600
+                val mins = (remainingSec % 3600) / 60
+                "${hrs}h ${mins}m"
+            } else {
+                "0h 0m"
+            }
+
+            val df = SimpleDateFormat("HH:mm", Locale.getDefault())
+            val transitionTimeStr = if (nextTransitionMs > 0) {
+                val nextLabel = if (status == "FASTING") "Eating Window" else "Fasting"
+                "$nextLabel starts at ${df.format(Date(nextTransitionMs))}"
+            } else {
+                "No transition scheduled"
+            }
+
+            val timerStr = if (remainingSec > 0) {
+                WidgetHelper.formatCountdownMinutes(remainingSec)
+            } else {
+                "00:00"
+            }
+            val timerStrSeconds = if (remainingSec > 0) {
+                WidgetHelper.formatCountdown(remainingSec)
+            } else {
+                "00:00:00"
+            }
+
+            val progressInt = (progress * 100).toInt()
+
+            // Check if any visible value changed. If not, bypass rebuilding & notify() to optimize resource usage.
+            if (timerStrSeconds == lastTimerStr &&
+                status == lastStatus &&
+                progressInt == lastProgressInt &&
+                weight == lastWeight &&
+                bodyFat == lastBodyFat &&
+                streak == lastStreak
+            ) {
+                // No visible change. Re-trigger widget update just in case, then return early.
+                WidgetHelper.triggerWidgetUpdate(this)
+                return
+            }
+
+            // Cache the new values
+            lastTimerStr = timerStrSeconds
+            lastStatus = status
+            lastProgressInt = progressInt
+            lastWeight = weight
+            lastBodyFat = bodyFat
+            lastStreak = streak
+
+            // Setup custom RemoteViews
+            val collapsedViews = RemoteViews(packageName, R.layout.notification_collapsed)
+            val expandedViews = RemoteViews(packageName, R.layout.notification_expanded)
+
+            // Calculate stage label dynamically based on total active duration
+            val stageLabel = if (status == "FASTING" && totalSec > 0) {
+                val totalHours = Math.round(totalSec.toDouble() / 3600.0).toInt()
+                if (totalHours in 12..23) "${totalHours}:${24 - totalHours} Fast" else "Fasting Window"
+            } else if ((status == "EATINGWINDOW" || status == "EATING_WINDOW") && totalSec > 0) {
+                val totalHours = Math.round(totalSec.toDouble() / 3600.0).toInt()
+                if (totalHours in 1..12) "${24 - totalHours}:${totalHours} Eating" else "Eating Window"
+            } else {
+                "Fomo IF"
+            }
+
+            // Collapsed texts
+            collapsedViews.setTextViewText(R.id.notification_status_title, stageLabel)
+            collapsedViews.setTextViewText(R.id.notification_subtitle, if (countdownEnabled) "$remainingStr remaining" else "Active")
+            collapsedViews.setTextViewText(R.id.notification_large_timer, timerStr)
+
+            // Collapsed progress
+            collapsedViews.setProgressBar(R.id.notification_progress_bar, 100, progressInt, false)
+
+            // Emoji status label for expanded layout
+            val emojiLabel = when (status) {
+                "FASTING" -> "🌙 FASTING"
+                "EATINGWINDOW", "EATING_WINDOW" -> "🍽 EATING WINDOW"
+                "PREPARING" -> "🍽 PREPARING"
+                "COMPLETED" -> "✓ COMPLETED"
+                "SKIPPED" -> "✕ SKIPPED"
+                "CANCELLED" -> "✕ CANCELLED"
+                else -> "🍽 EATING WINDOW"
+            }
+
+            // Expanded texts
+            expandedViews.setTextViewText(R.id.notification_expanded_title, stageLabel)
+            expandedViews.setTextViewText(R.id.notification_expanded_status, emojiLabel)
+            expandedViews.setTextColor(R.id.notification_expanded_status, color)
+            expandedViews.setTextViewText(R.id.notification_expanded_timer, if (remainingSec > 0) "$timerStrSeconds remaining" else "Completed!")
+            expandedViews.setTextViewText(R.id.notification_expanded_percentage, "$progressInt%")
+
+            // Expanded progress
+            expandedViews.setProgressBar(R.id.notification_expanded_progress, 100, progressInt, false)
+
+            // Setup PendingIntents for actions
+            val openIntent = PendingIntent.getActivity(
+                this, 301,
+                Intent(this, MainActivity::class.java).apply {
+                    action = "com.fastflow.action.NAVIGATE"
+                    putExtra("route", "/")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Build notification
+            val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setCustomContentView(collapsedViews)
+                .setCustomBigContentView(expandedViews)
+                .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
+                .setColor(color)
+                .setContentIntent(openIntent)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.notify(NOTIFICATION_ID, builder.build())
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
 
-        val label = WidgetHelper.getStatusLabel(status)
-        val color = WidgetHelper.getStatusColor(this, status)
-
-        val now = System.currentTimeMillis()
-        val totalSec = (endTimeMs - startTimeMs) / 1000
-        val elapsedSec = (now - startTimeMs) / 1000
-        val remainingSec = (endTimeMs - now) / 1000
-
-        val progress = if (totalSec > 0) {
-            val p = elapsedSec.toFloat() / totalSec.toFloat()
-            p.coerceIn(0f, 1f)
-        } else 0f
-
-        val elapsedStr = if (elapsedSec > 0) {
-            val hrs = elapsedSec / 3600
-            val mins = (elapsedSec % 3600) / 60
-            "${hrs}h ${mins}m"
-        } else {
-            "0h 0m"
-        }
-
-        val remainingStr = if (remainingSec > 0) {
-            val hrs = remainingSec / 3600
-            val mins = (remainingSec % 3600) / 60
-            "${hrs}h ${mins}m"
-        } else {
-            "0h 0m"
-        }
-
-        val df = SimpleDateFormat("HH:mm", Locale.getDefault())
-        val transitionTimeStr = if (nextTransitionMs > 0) {
-            val nextLabel = if (status == "FASTING") "Eating Window" else "Fasting"
-            "$nextLabel starts at ${df.format(Date(nextTransitionMs))}"
-        } else {
-            "No transition scheduled"
-        }
-
-        val timerStr = if (remainingSec > 0) {
-            WidgetHelper.formatCountdownMinutes(remainingSec)
-        } else {
-            "00:00"
-        }
-        val timerStrSeconds = if (remainingSec > 0) {
-            WidgetHelper.formatCountdown(remainingSec)
-        } else {
-            "00:00:00"
-        }
-
-        val progressInt = (progress * 100).toInt()
-
-        // Check if any visible value changed. If not, bypass rebuilding & notify() to optimize resource usage.
-        if (timerStrSeconds == lastTimerStr &&
-            status == lastStatus &&
-            progressInt == lastProgressInt &&
-            weight == lastWeight &&
-            bodyFat == lastBodyFat &&
-            streak == lastStreak
-        ) {
-            // No visible change. Re-trigger widget update just in case, then return early.
+        // Also trigger widget updates safely
+        try {
             WidgetHelper.triggerWidgetUpdate(this)
-            return
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-
-        // Cache the new values
-        lastTimerStr = timerStrSeconds
-        lastStatus = status
-        lastProgressInt = progressInt
-        lastWeight = weight
-        lastBodyFat = bodyFat
-        lastStreak = streak
-
-        // Setup custom RemoteViews
-        val collapsedViews = RemoteViews(packageName, R.layout.notification_collapsed)
-        val expandedViews = RemoteViews(packageName, R.layout.notification_expanded)
-
-        // Collapsed status icon
-        val iconRes = when (status) {
-            "FASTING" -> R.drawable.ic_nightlight
-            "EATINGWINDOW", "EATING_WINDOW" -> R.drawable.ic_restaurant
-            "PREPARING" -> R.drawable.ic_timer
-            "COMPLETED" -> R.drawable.ic_flag
-            else -> R.drawable.ic_schedule
-        }
-        collapsedViews.setImageViewResource(R.id.notification_status_icon, iconRes)
-        collapsedViews.setInt(R.id.notification_status_icon, "setColorFilter", color)
-
-        // Collapsed texts
-        collapsedViews.setTextViewText(R.id.notification_status_title, label)
-        collapsedViews.setTextColor(R.id.notification_status_title, color)
-        collapsedViews.setTextViewText(R.id.notification_subtitle, if (countdownEnabled) "$remainingStr remaining" else "Active")
-        collapsedViews.setTextViewText(R.id.notification_large_timer, timerStr)
-
-        // Collapsed progress
-        collapsedViews.setProgressBar(R.id.notification_progress_bar, 100, progressInt, false)
-
-        // Emoji status label for expanded layout
-        val emojiLabel = when (status) {
-            "FASTING" -> "🌙 FASTING"
-            "EATINGWINDOW", "EATING_WINDOW" -> "🍽 EATING WINDOW"
-            "PREPARING" -> "🍽 PREPARING"
-            "COMPLETED" -> "✓ COMPLETED"
-            "SKIPPED" -> "✕ SKIPPED"
-            "CANCELLED" -> "✕ CANCELLED"
-            else -> "🍽 EATING WINDOW"
-        }
-
-        // Expanded texts
-        expandedViews.setTextViewText(R.id.notification_expanded_status, emojiLabel)
-        expandedViews.setTextColor(R.id.notification_expanded_status, color)
-        expandedViews.setTextViewText(R.id.notification_expanded_timer, timerStrSeconds)
-
-        // Expanded progress
-        expandedViews.setProgressBar(R.id.notification_expanded_progress, 100, progressInt, false)
-
-        // Setup PendingIntents for actions
-        val openIntent = PendingIntent.getActivity(
-            this, 301,
-            Intent(this, MainActivity::class.java).apply {
-                action = "com.fastflow.action.NAVIGATE"
-                putExtra("route", "/")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // Build notification
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setCustomContentView(collapsedViews)
-            .setCustomBigContentView(expandedViews)
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .setColor(color)
-            .setContentIntent(openIntent)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(NOTIFICATION_ID, builder.build())
-
-        // Also trigger widget updates
-        WidgetHelper.triggerWidgetUpdate(this)
     }
 }
