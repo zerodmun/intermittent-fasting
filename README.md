@@ -196,3 +196,12 @@ For issues and feature requests, please use the GitHub issue tracker.
 ---
 
 *FastFlow - Fast smarter, track better, achieve your goals.*
+
+## 📱 Screenshots
+
+<p align="center">
+  <img src="screenshots/beranda.png" width="220"/>
+  <img src="screenshots/bodyfat.png" width="220"/>
+  <img src="screenshots/soon.png" width="220"/>
+  <img src="screenshots/stats.png" width="220"/>
+</p>
