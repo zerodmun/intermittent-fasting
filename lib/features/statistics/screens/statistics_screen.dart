@@ -3,16 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import '../../../core/constants/app_spacing.dart';
-import '../../../core/extensions/context_extensions.dart';
-import '../../../core/extensions/duration_extensions.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
 import 'package:fast_flow/core/data/services/hive_service.dart';
 import 'package:fast_flow/features/food_scanner/providers/food_logs_provider.dart';
 import 'package:fast_flow/features/statistics/screens/nutrition_details_screen.dart';
 import 'package:fast_flow/features/statistics/screens/food_intake_summary_screen.dart';
+import 'package:fast_flow/features/statistics/screens/weekly_detail_screen.dart';
+import 'package:fast_flow/features/statistics/screens/monthly_calendar_screen.dart';
+import 'package:fast_flow/features/statistics/screens/average_fast_detail_screen.dart';
 import 'package:fast_flow/features/statistics/providers/statistics_provider.dart';
-import '../../../shared/widgets/animated_progress_ring.dart';
-import '../../../shared/widgets/empty_state.dart';
+import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/stat_card.dart';
 import '../../../shared/widgets/section_header.dart';
@@ -25,7 +25,13 @@ class StatisticsScreen extends ConsumerWidget {
     final stats = ref.watch(statisticsProvider);
     final profileAsync = ref.watch(userProfileProvider);
     final foodLogs = ref.watch(foodLogsProvider);
+    final recordsAsync = ref.watch(fastingRecordsProvider);
     final theme = Theme.of(context);
+
+    final records = recordsAsync.maybeWhen(
+      data: (r) => r,
+      orElse: () => <FastingRecord>[],
+    );
 
     // Calculate Daily Calorie Requirement
     final profile = profileAsync.maybeWhen(
@@ -71,6 +77,76 @@ class StatisticsScreen extends ConsumerWidget {
     // Calculate Total Calories Consumed
     final totalFoodCalories = foodLogs.fold<double>(0.0, (sum, log) => sum + log.calories).round();
 
+    // Calculate Average Fasting Parameters
+    final completedRecords = records.where((r) => r.status == 'completed').toList();
+    final totalCompleted = completedRecords.length;
+    Duration totalFastingDuration = Duration.zero;
+    for (final r in completedRecords) {
+      totalFastingDuration += r.actualDuration;
+    }
+    final avgFastingDuration = totalCompleted > 0
+        ? Duration(minutes: (totalFastingDuration.inMinutes / totalCompleted).round())
+        : Duration.zero;
+
+    String formatDuration(Duration d) {
+      if (d == Duration.zero) return '-';
+      final hours = d.inHours;
+      final minutes = d.inMinutes % 60;
+      if (minutes == 0) {
+        return '${hours}h';
+      }
+      return '${hours}h ${minutes}m';
+    }
+
+    final avgFastFormatted = formatDuration(avgFastingDuration);
+
+    // Calculate Weekly Completion count and rate using real records
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+    int weeklyCompletedCount = 0;
+    for (int i = 0; i < 7; i++) {
+      final day = startOfWeek.add(Duration(days: i));
+      final hasCompleted = records.any((r) =>
+          r.status == 'completed' &&
+          r.startTime.year == day.year &&
+          r.startTime.month == day.month &&
+          r.startTime.day == day.day);
+      if (hasCompleted) {
+        weeklyCompletedCount++;
+      }
+    }
+    final weeklyCompletionPercent = ((weeklyCompletedCount / 7) * 100).round();
+
+    // Calculate Monthly Trend grouped by week
+    final List<DateTime> mondaysOfCurrentMonth = [];
+    final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
+    for (int d = 1; d <= lastDayOfMonth.day; d++) {
+      final dayDate = DateTime(now.year, now.month, d);
+      final m = dayDate.subtract(Duration(days: dayDate.weekday - 1));
+      if (!mondaysOfCurrentMonth.contains(m)) {
+        mondaysOfCurrentMonth.add(m);
+      }
+    }
+    mondaysOfCurrentMonth.sort((a, b) => a.compareTo(b));
+
+    final List<double> monthlyWeeklyPercentages = [];
+    for (final monday in mondaysOfCurrentMonth) {
+      int completedInWeek = 0;
+      for (int i = 0; i < 7; i++) {
+        final targetDay = monday.add(Duration(days: i));
+        final hasCompleted = records.any((r) =>
+            r.status == 'completed' &&
+            r.startTime.year == targetDay.year &&
+            r.startTime.month == targetDay.month &&
+            r.startTime.day == targetDay.day);
+        if (hasCompleted) {
+          completedInWeek++;
+        }
+      }
+      monthlyWeeklyPercentages.add((completedInWeek / 7.0) * 100.0);
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Analytics'),
@@ -80,6 +156,7 @@ class StatisticsScreen extends ConsumerWidget {
           ref.invalidate(statisticsProvider);
           ref.invalidate(userProfileProvider);
           ref.invalidate(foodLogsProvider);
+          ref.invalidate(fastingRecordsProvider);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -87,18 +164,14 @@ class StatisticsScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildStatsGrid(context, stats, dailyCalories, totalFoodCalories, theme),
-              const SectionHeader(title: 'Completion Rate'),
-              stats.totalSessions == 0
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding, vertical: AppSpacing.md),
-                      child: EmptyState(
-                        icon: Icons.analytics_outlined,
-                        title: 'No fasting data',
-                        subtitle: 'Complete a fasting session to see success rate.',
-                      ),
-                    )
-                  : _buildCompletionCard(context, stats),
+              _buildStatsGrid(
+                context,
+                stats,
+                dailyCalories,
+                totalFoodCalories,
+                avgFastFormatted,
+                theme,
+              ),
               const SectionHeader(title: 'This Week'),
               stats.totalSessions == 0
                   ? const Padding(
@@ -110,7 +183,13 @@ class StatisticsScreen extends ConsumerWidget {
                         ),
                       ),
                     )
-                  : _buildWeeklyChart(context, stats),
+                  : _buildWeeklyChartCard(
+                      context,
+                      stats,
+                      weeklyCompletedCount,
+                      weeklyCompletionPercent,
+                      theme,
+                    ),
               const SectionHeader(title: 'Monthly Trend'),
               stats.totalSessions == 0
                   ? const Padding(
@@ -122,7 +201,12 @@ class StatisticsScreen extends ConsumerWidget {
                         ),
                       ),
                     )
-                  : _buildMonthlyChart(context, stats),
+                  : _buildMonthlyChartCard(
+                      context,
+                      monthlyWeeklyPercentages,
+                      mondaysOfCurrentMonth,
+                      theme,
+                    ),
             ],
           ),
         ),
@@ -135,6 +219,7 @@ class StatisticsScreen extends ConsumerWidget {
     StatsData stats,
     int dailyCalories,
     int totalFoodCalories,
+    String avgFastFormatted,
     ThemeData theme,
   ) {
     return Padding(
@@ -179,14 +264,24 @@ class StatisticsScreen extends ConsumerWidget {
           ),
           StatCard(
             icon: Icons.timer_outlined,
-            label: 'Avg Duration',
-            value: Duration(minutes: stats.averageDurationMinutes.round()).toReadable,
+            label: 'Average Fast',
+            value: avgFastFormatted,
+            subtitle: 'Tap for details',
             color: theme.colorScheme.secondary,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AverageFastDetailScreen(),
+                ),
+              );
+            },
           ),
           StatCard(
             icon: Icons.hourglass_empty_rounded,
             label: 'Total Fasted',
             value: '${stats.totalFastingHours.toStringAsFixed(1)}h',
+            subtitle: 'Cumulative hours',
             color: theme.colorScheme.tertiary,
           ),
         ],
@@ -194,49 +289,50 @@ class StatisticsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCompletionCard(BuildContext context, StatsData stats) {
-    final theme = Theme.of(context);
+  Widget _buildWeeklyChartCard(
+    BuildContext context,
+    StatsData stats,
+    int completedCount,
+    int completionPercent,
+    ThemeData theme,
+  ) {
     final colorScheme = theme.colorScheme;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
       child: AppCard.elevated(
-        child: Row(
-          children: [
-            AnimatedProgressRing(
-              progress: stats.completionRate / 100,
-              size: 90,
-              strokeWidth: 8,
-              color: context.colors.success,
-              backgroundColor: context.colors.success.withValues(alpha: 0.15),
-              child: Text(
-                '${stats.completionRate.toStringAsFixed(0)}%',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-              ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const WeeklyDetailScreen(),
             ),
-            const SizedBox(width: AppSpacing.xlg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Success Rate',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+          );
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '$completedCount / 7 Completed',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'You completed ${stats.totalCompleted} out of ${stats.totalSessions} started fasting cycles.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                ),
+                Text(
+                  '$completionPercent%',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              height: 160,
+              child: _buildWeeklyChartContent(context, stats, theme),
             ),
           ],
         ),
@@ -244,139 +340,191 @@ class StatisticsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildWeeklyChart(BuildContext context, StatsData stats) {
-    final theme = Theme.of(context);
+  Widget _buildWeeklyChartContent(BuildContext context, StatsData stats, ThemeData theme) {
     final colorScheme = theme.colorScheme;
     final hasData = stats.weeklyData.any((v) => v > 0);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
-      child: AppCard.elevated(
-        child: SizedBox(
-          height: 200,
-          child: hasData
-              ? BarChart(
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: 24,
-                    barTouchData: BarTouchData(
-                      enabled: true,
-                      touchTooltipData: BarTouchTooltipData(
-                        getTooltipColor: (_) => colorScheme.primaryContainer,
-                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                          return BarTooltipItem(
-                            '${rod.toY.toStringAsFixed(1)}h',
-                            theme.textTheme.labelMedium!.copyWith(
-                              color: colorScheme.onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    titlesData: FlTitlesData(
-                      show: true,
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (value, meta) {
-                            const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-                            final idx = value.toInt();
-                            if (idx >= 0 && idx < days.length) {
-                              return SideTitleWidget(
-                                meta: meta,
-                                child: Text(
-                                  days[idx],
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
-                        ),
-                      ),
-                      leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    ),
-                    gridData: const FlGridData(show: false),
-                    borderData: FlBorderData(show: false),
-                    barGroups: List.generate(7, (index) {
-                      return BarChartGroupData(
-                        x: index,
-                        barRods: [
-                          BarChartRodData(
-                            toY: stats.weeklyData[index],
-                            color: colorScheme.primary,
-                            width: 14,
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(AppSpacing.radiusSm),
-                            ),
-                          ),
-                        ],
-                      );
-                    }),
-                  ),
-                )
-              : Center(
-                  child: Text(
-                    'No weekly data logged.',
-                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                  ),
-                ),
+    if (!hasData) {
+      return Center(
+        child: Text(
+          'No weekly data logged.',
+          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
         ),
+      );
+    }
+
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: 24,
+        barTouchData: BarTouchData(
+          enabled: true,
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipColor: (_) => colorScheme.primaryContainer,
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              return BarTooltipItem(
+                '${rod.toY.toStringAsFixed(1)}h',
+                theme.textTheme.labelMedium!.copyWith(
+                  color: colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.bold,
+                ),
+              );
+            },
+          ),
+        ),
+        titlesData: FlTitlesData(
+          show: true,
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) {
+                const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                final idx = value.toInt();
+                if (idx >= 0 && idx < days.length) {
+                  return SideTitleWidget(
+                    meta: meta,
+                    child: Text(
+                      days[idx],
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        gridData: const FlGridData(show: false),
+        borderData: FlBorderData(show: false),
+        barGroups: List.generate(7, (index) {
+          return BarChartGroupData(
+            x: index,
+            barRods: [
+              BarChartRodData(
+                toY: stats.weeklyData[index],
+                color: colorScheme.primary,
+                width: 14,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppSpacing.radiusSm),
+                ),
+              ),
+            ],
+          );
+        }),
       ),
     );
   }
 
-  Widget _buildMonthlyChart(BuildContext context, StatsData stats) {
-    final theme = Theme.of(context);
+  Widget _buildMonthlyChartCard(
+    BuildContext context,
+    List<double> weeklyPercentages,
+    List<DateTime> mondays,
+    ThemeData theme,
+  ) {
     final colorScheme = theme.colorScheme;
-    final hasData = stats.monthlyData.any((v) => v > 0);
+    final hasData = weeklyPercentages.any((v) => v > 0);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
       child: AppCard.elevated(
-        child: SizedBox(
-          height: 200,
-          child: hasData
-              ? LineChart(
-                  LineChartData(
-                    lineTouchData: const LineTouchData(enabled: true),
-                    gridData: const FlGridData(show: false),
-                    titlesData: const FlTitlesData(
-                      leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    lineBarsData: [
-                      LineChartBarData(
-                        spots: List.generate(30, (index) {
-                          return FlSpot(index.toDouble(), stats.monthlyData[index]);
-                        }),
-                        isCurved: true,
-                        color: colorScheme.primary,
-                        barWidth: 3,
-                        isStrokeCapRound: true,
-                        dotData: const FlDotData(show: false),
-                        belowBarData: BarAreaData(
-                          show: true,
-                          color: colorScheme.primary.withValues(alpha: 0.15),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MonthlyCalendarScreen(),
+            ),
+          );
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Weekly Completion rate',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              height: 160,
+              child: hasData
+                  ? BarChart(
+                      BarChartData(
+                        maxY: 100,
+                        alignment: BarChartAlignment.spaceAround,
+                        barTouchData: BarTouchData(
+                          enabled: true,
+                          touchTooltipData: BarTouchTooltipData(
+                            getTooltipColor: (_) => colorScheme.primaryContainer,
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                              return BarTooltipItem(
+                                '${rod.toY.round()}%',
+                                theme.textTheme.labelMedium!.copyWith(
+                                  color: colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            },
+                          ),
                         ),
+                        titlesData: FlTitlesData(
+                          show: true,
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (value, meta) {
+                                final idx = value.toInt();
+                                if (idx >= 0 && idx < mondays.length) {
+                                  return SideTitleWidget(
+                                    meta: meta,
+                                    child: Text(
+                                      'W${idx + 1}',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
+                          ),
+                          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        ),
+                        gridData: const FlGridData(show: false),
+                        borderData: FlBorderData(show: false),
+                        barGroups: List.generate(mondays.length, (idx) {
+                          return BarChartGroupData(
+                            x: idx,
+                            barRods: [
+                              BarChartRodData(
+                                toY: weeklyPercentages[idx],
+                                color: colorScheme.secondary,
+                                width: 16,
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(AppSpacing.radiusSm),
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
                       ),
-                    ],
-                  ),
-                )
-              : Center(
-                  child: Text(
-                    'No monthly trend logged.',
-                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                  ),
-                ),
+                    )
+                  : Center(
+                      child: Text(
+                        'No monthly trend logged.',
+                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    ),
+            ),
+          ],
         ),
       ),
     );

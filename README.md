@@ -4,7 +4,7 @@ A modern, offline-first Flutter application for intermittent fasting tracking an
 
 ## Features
 
-### Fasting Tracker
+### Fasting Tracker & Notifications
 - **Schedule-driven engine** - No start/stop buttons needed. The app automatically determines your fasting state from the current time and your daily schedule.
 - **Real-time countdown** - Live timer updating every second with circular progress ring
 - **Multiple fasting windows** - Different fasting/eating times for each day of the week
@@ -12,8 +12,15 @@ A modern, offline-first Flutter application for intermittent fasting tracking an
 - **Calendar view** - Monthly overview with completion markers
 - **Manual overrides** - Mark sessions as completed, skipped, or cancelled with custom times
 - **Copy Monday to All** - Quick setup for consistent weekly schedules
+- **Redesigned Notification UI** - Modern Material 3 custom style featuring dynamic stage calculations (e.g., `16:8 Fast`), percentage completion displays, and a clean thin horizontal progress indicator (4dp height).
 
-### Body Composition
+### Nutrition & Calorie Tracker (Redesigned Statistics)
+- **Daily Calorie Requirement** - Miffln-St Jeor calorie needs calculation using user profiles (age, gender, height, weight) with custom activity multipliers and weight goals.
+- **Nutrition Details Page** - Targets for calories, protein, fat, carbohydrates, fiber, and water intake with educational advice cards.
+- **Total Calories Consumed** - Real-time summation of calories from all food scanner history logs.
+- **Food Intake Summary Page** - Review calorie, protein, fat, carb, and fiber totals, and simulate logging via mock scanners.
+
+### Body Composition & History
 - **US Navy Body Fat Formula** - Accurate body fat % from waist, neck, hip measurements
 - **Automatic calculations** - BMI, BMR, TDEE, Lean Mass, Fat Mass
 - **Health categories** - Essential Fat, Athlete, Fitness, Average, Obese (gender-specific)
@@ -21,18 +28,14 @@ A modern, offline-first Flutter application for intermittent fasting tracking an
 - **Measurement history** - Weight, waist, neck, hip, chest, arms, thighs, calves
 - **Charts** - Weight, body fat %, lean mass, fat mass, BMI, waist, chest, arms, thighs, calves (weekly/monthly/yearly/all time)
 
-### Smart Features
-- **Streak tracking** - Current and longest fasting streaks
-- **Auto history generation** - Automatically creates completed records for past days
-- **Offline notifications** - Fasting start, eating window start, preparing alerts (2 hours before fast)
+### Smart Robustness Features
+- **100% Offline Execution** - Bundled local Google Fonts (Inter) assets and disabled runtime network fetching to guarantee full offline compatibility.
+- **Initialization Timeout Guard** - Service initializations run concurrently and are capped by a 4-second timeout to ensure the splash screen never freezes.
+- **Fail-Safe Hive Storage** - Box openings run with 4-level automatic recovery/deletion and temp path fallbacks.
+- **Crash Prevention** - Try-catch wraps in Android 12+ foreground services, AppWidgetProviders, and notification engines prevent background execution crashes.
 - **Data export/import** - Full JSON backup/restore
 - **Dark/Light theme** - System-aware with manual override
-
-### Onboarding
-1. **Welcome** - Feature overview
-2. **Profile** - Name, age, gender, height, current weight
-3. **Goals** - Target weight, body fat %, waist, BMI
-4. **Schedule** - Per-day fasting/eating times with "Copy Monday" shortcut
+- **Onboarding** - 4-step setup flow (Welcome, Profile, Goals, Schedule)
 
 ---
 
