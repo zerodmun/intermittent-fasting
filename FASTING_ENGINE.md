@@ -2,66 +2,63 @@
 
 ## Overview
 
-The Fomo IF fasting engine is a **singleton service** that calculates fasting state in real-time from:
-- **Current DateTime** (system clock)
-- **User Daily Schedule** (single source of truth)
+The Fomo IF fasting engine is a **timeline-based, session-centric service** that calculates the active fasting or eating state in real-time. Unlike calendar-based systems, it is **session-based rather than day-based**, ensuring that fasting sessions crossing midnight (e.g. overnight fasts) are handled seamlessly without resets or schedule leakage.
 
-No manual start/stop buttons required. The engine runs continuously and automatically determines the current fasting state.
+No manual start/stop buttons are required. The engine runs continuously, resolving current states automatically and updating native widgets and notifications dynamically.
 
 ---
 
 ## Architecture
 
-### Core Components
+The fasting engine has been completely refactored to a **Timeline-Based** architecture. Daily schedules are generated as isolated, self-contained `TimelineSession` ranges, which are then evaluated sequentially by the resolver.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    FastingEngine (Singleton)                │
-├─────────────────────────────────────────────────────────────┤
-│  • ONE Timer.periodic (1 second)                            │
-│  • Reads current DateTime + Schedule on every tick          │
-│  • Computes FastingState                                    │
-│  • Notifies listeners (Riverpod)                            │
+│                    Weekly Fasting Schedule                  │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
+                               │
+                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Riverpod Providers                       │
+│             TimelineGenerator (Rolling 21-day Window)       │
 ├─────────────────────────────────────────────────────────────┤
-│  • fastingEngineProvider    → Singleton instance            │
-│  • fastingStateProvider2    → NotifierProvider<FastingState?>│
+│  • Maps daily weekday schedules to absolute DateTime ranges │
+│  • Generates chronological list of isolated TimelineSessions │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
+                               │
+                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                        UI Layer                             │
+│             SessionResolver (Sequential Engine)            │
 ├─────────────────────────────────────────────────────────────┤
-│  • HomeScreen           → Status card, progress ring        │
-│  • FastingScreen        → Timer, Schedule, Timeline, Calendar│
-│  • HistoryScreen        → Past records                      │
+│  • Resolves current state by evaluating sessions list       │
+│  • Search Order: 1. Prev Session, 2. Current Window, 3. Next │
+│  • Computes: elapsed, remaining, progress, next transition  │
+└─────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│              FastingEngine (1Hz Timer Singleton)            │
+├─────────────────────────────────────────────────────────────┤
+│  • Caches rolling timeline, ticking once per second         │
+│  • Subscribes to Hive watch streams for reactive updates    │
+│  • Publishes FastingState & syncs to native widget systems  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Data Flow
+### Core Services
 
-```
-Timer Tick (1s)
-     │
-     ▼
-DateTime.now() + Schedule.getScheduleFor(weekday)
-     │
-     ▼
-Compute Active Window (checks yesterday/today/tomorrow)
-     │
-     ▼
-Check Manual Override (FastingRecord for cycle date)
-     │
-     ▼
-Calculate: Status, Elapsed, Remaining, Progress, Next Transition
-     │
-     ▼
-Update FastingState → Notify Riverpod → UI Rebuilds
-```
+1. **Timeline Generator** (`timeline_generator.dart`)
+   - Generates a chronologically sorted list of `TimelineSession` ranges.
+   - **Schedule Isolation**: A session's start and end times are determined solely by the day the fast starts. Changing Saturday's schedule will never affect an active Friday session.
+
+2. **Session Resolver** (`session_resolver.dart`)
+   - Sequentially analyzes the `TimelineSession` list relative to `DateTime.now()` and any manual Hive log overrides.
+   - **Chronological Search Order**:
+     1. **Previous Session**: If the most recent session is active (started before now, and ends after now, with no manual completed/skipped/cancelled override), it continues using that session. Changing calendar days never interrupts active fasts.
+     2. **Eating Window**: If the previous session is ended, it resolves to the eating window leading to the start of the next session.
+     3. **Next Session**: Determines transition states.
+
+3. **History Generator** (`history_generator.dart`)
+   - Scans the timeline of the past 7 days and automatically generates completed historical records for finished fasting sessions that do not already have manual override records in Hive.
 
 ---
 
@@ -71,57 +68,43 @@ Update FastingState → Notify Riverpod → UI Rebuilds
 
 ```dart
 final engine = FastingEngine();
-engine.initialize();  // Starts timer, auto-generates history
+engine.initialize();  // Subscribes to Hive watch streams, starts 1Hz timer, auto-generates history
 ```
 
 Called automatically via `fastingEngineProvider` in `main.dart`.
 
-### State Access
+### Reactive State Updates
 
-```dart
-// Current computed state (nullable until first tick)
-FastingState? state = engine.currentState;
+State updates are fully reactive and happen instantly. There is no caching of stale schedules or records:
 
-// Reactive updates via listener
-engine.addListener(() {
-  final state = engine.currentState;
-  // Update UI
-});
-```
-
-### Schedule Changes
-
-```dart
-// Call after saving new schedule to Hive
-engine.onScheduleChanged();
-// Or via notifier:
-ref.read(fastingStateProvider2.notifier).onScheduleChanged();
-```
-
-### Record Changes
-
-```dart
-// Call after adding/editing/deleting FastingRecord
-engine.onRecordChanged();
-// Or via notifier:
-ref.read(fastingStateProvider2.notifier).refresh();
-```
+- **Schedule Watcher**: The engine subscribes to `fastingScheduleBox.watch(key: 'schedule')`. Any schedule edit immediately invalidates cached timelines, recalculates the active session, and refreshes the home screen, notification, and widgets.
+- **Records Watcher**: The engine subscribes to `fastingRecordsBox.watch()`. Manual logs (adds, edits, skips, deletes) trigger instant updates.
 
 ---
 
-## FastingState
+## TimelineSession Model
+
+```dart
+class TimelineSession {
+  final DateTime expectedStart; // Scheduled start datetime
+  final DateTime expectedEnd;   // Scheduled end datetime (offset by 1 day if crossing midnight)
+  final int weekday;            // Weekday index (1-7) of the starting day
+}
+```
+
+## FastingState Model
 
 ```dart
 class FastingState {
-  final FastingStatus status;           // Current status enum
+  final FastingStatus status;           // Current status enum (fasting, eatingWindow, preparing, etc.)
   final Duration elapsed;               // Time elapsed in current window
-  final Duration remaining;             // Time remaining in current window
-  final double progress;                // 0.0 - 1.0 progress
+  final Duration remaining;             // Time remaining in current window (directly targeted from endDateTime)
+  final double progress;                // 0.0 - 1.0 progress fraction
   final FastingSchedule schedule;       // Current schedule
   final DateTime activeWindowStart;     // Window start time
-  final DateTime activeWindowEnd;       // Window end time
+  final DateTime activeWindowEnd;       // Window end time (Countdown target)
   final FastingPhase currentPhase;      // fasting | eating
-  final DateTime nextTransition;        // Next phase change time
+  final DateTime nextTransition;        // Next transition time
   final FastingPhase nextPhase;         // Next phase
 }
 ```
@@ -137,327 +120,18 @@ class FastingState {
 | `skipped` | Manual override: skipped |
 | `cancelled` | Manual override: cancelled |
 
-### FastingPhase Enum
-
-| Value | Description |
-|-------|-------------|
-| `fasting` | Fasting phase |
-| `eating` | Eating phase |
-
 ---
 
-## Riverpod Usage
+## UI Integration
 
-### Watching State
-
-```dart
-// In a ConsumerWidget
-final state = ref.watch(fastingStateProvider2);
-
-// Or using the stream provider (alternative)
-final state = ref.watch(fastingStateProvider);
-```
-
-### Manual Actions
+### Visual Separation & Decoupling
+To enforce that the weekly schedule is never used as the direct source of truth for UI, all active schedule displays must read properties from `activeWindowStart.weekday` instead of `DateTime.now().weekday`.
 
 ```dart
-final notifier = ref.read(fastingStateProvider2.notifier);
+// Display targets for the active plan card
+final activeWeekday = state.activeWindowStart.weekday;
+final activePlan = state.schedule.getScheduleFor(activeWeekday);
 
-// Mark completed/skipped/cancelled
-notifier.logManualAction('completed');
-notifier.logManualAction('skipped');
-notifier.logManualAction('cancelled');
-
-// Edit existing record
-notifier.editFastingRecord(
-  id: record.id,
-  startTime: newStart,
-  endTime: newEnd,
-  status: 'completed',
-  note: 'Felt great!',
-  reason: 'Early dinner',
-);
-
-// Save schedule changes (called from Schedule screen)
-notifier.saveSchedule(newSchedule);
+print('Active plan starts at: ${activePlan.fastTimeFormatted}');
+print('Active plan ends at: ${activePlan.eatTimeFormatted}');
 ```
-
----
-
-## Schedule Model
-
-### FastingSchedule
-
-```dart
-class FastingSchedule {
-  // Key: 1=Monday ... 7=Sunday
-  // Value: {fastHour, fastMin, eatHour, eatMin}
-  Map<int, Map<String, int>> dailySchedules;
-  
-  Map<String, int> getScheduleFor(int weekday);
-  
-  FastingSchedule copyWith({Map<int, Map<String, int>>? dailySchedules});
-  
-  static FastingSchedule defaultSchedule(); // 17:00 - 09:00 daily
-}
-```
-
-### Example: 16:8 Schedule
-
-```dart
-final schedule = FastingSchedule(dailySchedules: {
-  1: {'fastHour': 20, 'fastMin': 0, 'eatHour': 12, 'eatMin': 0},  // Mon
-  2: {'fastHour': 20, 'fastMin': 0, 'eatHour': 12, 'eatMin': 0},  // Tue
-  // ... etc
-});
-```
-
-### Copy Monday to All
-
-```dart
-final monday = schedule.getScheduleFor(1);
-final updatedMap = Map<int, Map<String, int>>.from(schedule.dailySchedules);
-for (int i = 2; i <= 7; i++) {
-  updatedMap[i] = Map<String, int>.from(monday);
-}
-final updatedSchedule = schedule.copyWith(dailySchedules: updatedMap);
-```
-
----
-
-## Active Window Calculation
-
-The engine checks **3 days** (yesterday, today, tomorrow) to find the active window:
-
-```
-For each candidate day:
-  1. Get schedule for weekday
-  2. Create eatingTime and fastingTime DateTimes
-  3. If eating < fasting (overnight fast):
-       Eating window: eatingTime → fastingTime
-       Fasting window: fastingTime → eatingTime + 1 day
-     Else (same-day fast):
-       Fasting window: fastingTime → eatingTime
-       Eating window: eatingTime → fastingTime + 1 day
-  4. Check if now is within either window
-```
-
-### Cycle Start Date
-
-Each fasting cycle has a `cycleStartDate` (date-only) used for:
-- Finding manual overrides (`FastingRecord` for that date)
-- Calculating next transition
-- History grouping
-
----
-
-## Manual Overrides
-
-### FastingRecord
-
-```dart
-class FastingRecord {
-  String id;
-  String planName;
-  int fastingMinutes;
-  int eatingMinutes;
-  DateTime startTime;
-  DateTime? endTime;
-  String status;  // 'active', 'completed', 'cancelled', 'skipped'
-  String? note;
-  String? reason;
-}
-```
-
-### Override Logic
-
-When a record exists for the cycle date:
-- **Actual start/end** = record's startTime/endTime (not schedule)
-- **Phase** = determined by current time vs actual times
-- **Status** = record's status (completed/skipped/cancelled)
-
----
-
-## History Generation
-
-Auto-generates completed records for past days (up to yesterday):
-
-```dart
-// Runs once on first launch, then daily
-while (loopDate < today) {
-  if (no record exists for loopDate) {
-    create record with:
-      - startTime = schedule fasting time
-      - endTime = startTime + fasting minutes
-      - status = 'completed'
-  }
-  loopDate += 1 day;
-}
-```
-
-Triggered via `last_history_gen_date` setting.
-
----
-
-## UI Integration Examples
-
-### Home Screen Status Card
-
-```dart
-Widget build(BuildContext context, WidgetRef ref) {
-  final state = ref.watch(fastingStateProvider2);
-  
-  if (state == null) return CircularProgressIndicator();
-  
-  final isFasting = state.currentPhase == FastingPhase.fasting;
-  final gradient = isFasting ? AppColors.fastingGradient : AppColors.eatingGradient;
-  
-  String title = 'Fasting Active';
-  if (state.status == FastingStatus.eatingWindow) title = 'Eating Window';
-  if (state.status == FastingStatus.preparing) title = 'Preparing to Fast';
-  if (state.status == FastingStatus.completed) title = 'Fasting Completed';
-  
-  return GradientCard(
-    gradient: gradient,
-    child: Row(
-      children: [
-        Expanded(child: Column(...)),
-        AnimatedProgressRing(
-          progress: state.progress,
-          child: Text(state.remaining.toHHMM), // Uses duration extension
-        ),
-      ],
-    ),
-  );
-}
-```
-
-### Timer Screen
-
-```dart
-final state = ref.watch(fastingStateProvider2);
-final notifier = ref.read(fastingStateProvider2.notifier);
-
-@override
-Widget build(BuildContext context) {
-  final state = ref.watch(fastingStateProvider2);
-  
-  if (state == null) return Center(child: CircularProgressIndicator());
-  
-  Color ringColor;
-  switch (state.status) {
-    case FastingStatus.fasting: ringColor = AppColors.fastingActive; break;
-    case FastingStatus.eatingWindow: ringColor = AppColors.eatingActive; break;
-    case FastingStatus.preparing: ringColor = AppColors.amber400; break;
-    case FastingStatus.completed: ringColor = AppColors.success; break;
-    case FastingStatus.skipped: ringColor = Colors.grey; break;
-    default: ringColor = Theme.of(context).colorScheme.primary;
-  }
-  
-  return AnimatedProgressRing(
-    progress: state.progress,
-    size: 260,
-    color: ringColor,
-    child: Text(state.remaining.toHHMMSS),
-  );
-}
-```
-
-### Schedule Editing
-
-```dart
-onPressed: () async {
-  final selected = await showTimePicker(
-    context: context,
-    initialTime: TimeOfDay(hour: fastHour, minute: fastMin),
-  );
-  if (selected != null) {
-    final updatedMap = Map<int, Map<String, int>>.from(schedule.dailySchedules);
-    updatedMap[weekdayNum] = {
-      'fastHour': selected.hour,
-      'fastMin': selected.minute,
-      'eatHour': eatHour,
-      'eatMin': eatMin,
-    };
-    notifier.saveSchedule(schedule.copyWith(dailySchedules: updatedMap));
-  }
-},
-```
-
----
-
-## Key Behaviors
-
-| Scenario | Behavior |
-|----------|----------|
-| App launch | Timer starts, computes initial state |
-| Hot reload | Timer persists (singleton), state preserved |
-| Navigate away/back | Timer continues running |
-| Edit today's schedule | `onScheduleChanged()` → immediate recalc |
-| Manual override | `logManualAction()` → state updates next tick |
-| Past date edit | Only affects history, not current state |
-| Midnight crossover | Handles overnight windows correctly |
-| Timezone change | Uses `DateTime.now()` (system time) |
-
----
-
-## Testing
-
-```dart
-// Mock engine for widget tests
-final mockEngine = MockFastingEngine();
-when(mockEngine.currentState).thenReturn(testState);
-
-await tester.pumpWidget(
-  ProviderScope(
-    overrides: [
-      fastingEngineProvider.overrideWithValue(mockEngine),
-    ],
-    child: MyApp(),
-  ),
-);
-```
-
----
-
-## Migration Notes
-
-### Removed
-- `FastingTimerProvider` (old NotifierProvider)
-- `FastingTimerState` class
-- `FastingTimerNotifier` class
-- `formattedShort`, `formattedTime`, `formattedDateTime` extensions
-
-### Added
-- `FastingEngine` singleton service
-- `FastingState`, `FastingStatus`, `FastingPhase` enums
-- `fastingStateProvider2` (NotifierProvider)
-- All DateTime formatting uses `intl.DateFormat` directly
-
----
-
-## File Structure
-
-```
-lib/features/fasting/
-├── models/
-│   ├── fasting_schedule.dart
-│   ├── fasting_record.dart
-│   └── fasting_state.dart (removed - types in engine)
-├── providers/
-│   └── fasting_provider.dart
-├── screens/
-│   └── fasting_screen.dart
-└── services/
-    └── fasting_engine.dart  ← NEW: Core engine
-```
-
----
-
-## Performance
-
-- **Single timer** for entire app lifetime
-- **Minimal allocations** per tick (reuses objects where possible)
-- **Distinct check** in stream provider prevents unnecessary rebuilds
-- **Lazy initialization** - timer starts only when provider first read
-- **Proper disposal** - timer cancelled when provider disposed
