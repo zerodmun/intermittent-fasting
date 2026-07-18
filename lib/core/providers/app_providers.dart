@@ -8,18 +8,38 @@ import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart'
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
 
 final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
+  final box = HiveService.instance.userProfileBox;
+  final subscription = box.watch(key: 'profile').listen((_) {
+    ref.invalidateSelf();
+  });
+  ref.onDispose(() => subscription.cancel());
   return HiveService.instance.userProfile;
 });
 
 final fastingScheduleProvider = FutureProvider<FastingSchedule>((ref) async {
+  final box = HiveService.instance.fastingScheduleBox;
+  final subscription = box.watch(key: 'schedule').listen((_) {
+    ref.invalidateSelf();
+  });
+  ref.onDispose(() => subscription.cancel());
   return HiveService.instance.fastingSchedule;
 });
 
 final fastingRecordsProvider = FutureProvider<List<FastingRecord>>((ref) async {
+  final box = HiveService.instance.fastingRecordsBox;
+  final subscription = box.watch().listen((_) {
+    ref.invalidateSelf();
+  });
+  ref.onDispose(() => subscription.cancel());
   return HiveService.instance.allFastingRecords;
 });
 
 final weightEntriesProvider = FutureProvider<List<WeightEntry>>((ref) async {
+  final box = HiveService.instance.weightEntriesBox;
+  final subscription = box.watch().listen((_) {
+    ref.invalidateSelf();
+  });
+  ref.onDispose(() => subscription.cancel());
   return HiveService.instance.allWeightEntries;
 });
 

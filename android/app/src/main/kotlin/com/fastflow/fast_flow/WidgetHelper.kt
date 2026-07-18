@@ -110,6 +110,12 @@ object WidgetHelper {
         return String.format("%02d:%02d:%02d", hrs, mins, secs)
     }
 
+    fun formatCountdownMinutes(seconds: Long): String {
+        val hrs = seconds / 3600
+        val mins = (seconds % 3600) / 60
+        return String.format("%02d:%02d", hrs, mins)
+    }
+
     fun triggerWidgetUpdate(context: Context) {
         try {
             val appWidgetManager = AppWidgetManager.getInstance(context)

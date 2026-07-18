@@ -23,9 +23,9 @@ class AppScaffold extends StatelessWidget {
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history_rounded),
-            label: 'History',
+            icon: Icon(Icons.qr_code_scanner_outlined),
+            selectedIcon: Icon(Icons.qr_code_scanner_rounded),
+            label: 'Food Scanner',
           ),
           NavigationDestination(
             icon: Icon(Icons.bar_chart_outlined),

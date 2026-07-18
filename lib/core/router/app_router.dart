@@ -10,6 +10,7 @@ import 'package:fast_flow/features/statistics/screens/statistics_screen.dart';
 import 'package:fast_flow/features/weight/screens/weight_screen.dart';
 import 'package:fast_flow/features/body_composition/presentation/screens/body_comp_screen.dart';
 import 'package:fast_flow/features/body_composition/presentation/screens/progress_photos_screen.dart';
+import 'package:fast_flow/features/food_scanner/presentation/pages/food_scanner_screen.dart';
 import 'package:fast_flow/shared/widgets/app_scaffold.dart';
 
 /// App-wide route configuration using GoRouter with shell routing.
@@ -20,7 +21,8 @@ class AppRouter {
 
   static const String onboarding = '/onboarding';
   static const String home = '/home';
-  static const String history = '/history';
+  static const String history = '/home/history';
+  static const String foodScanner = '/food-scanner';
   static const String statistics = '/statistics';
   static const String settings = '/settings';
   static const String fasting = '/fasting';
@@ -63,6 +65,10 @@ class AppRouter {
                     builder: (context, state) => const WeightScreen(),
                   ),
                   GoRoute(
+                    path: 'history',
+                    builder: (context, state) => const HistoryScreen(),
+                  ),
+                  GoRoute(
                     path: 'body-composition',
                     builder: (context, state) => const BodyCompScreen(),
                     routes: [
@@ -79,8 +85,8 @@ class AppRouter {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: history,
-                builder: (context, state) => const HistoryScreen(),
+                path: foodScanner,
+                builder: (context, state) => const FoodScannerScreen(),
               ),
             ],
           ),

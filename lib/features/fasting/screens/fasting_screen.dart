@@ -160,7 +160,8 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
         centerIcon = Icons.timer_outlined;
     }
 
-    final todaySched = state.schedule.getScheduleFor(DateTime.now().weekday);
+    final activeWeekday = state.activeWindowStart.weekday;
+    final activeSched = state.schedule.getScheduleFor(activeWeekday);
 
     return SingleChildScrollView(
       key: const ValueKey('timer_segment'),
@@ -213,7 +214,7 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  "Today's Plan",
+                  "Active Plan",
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -223,12 +224,12 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildTimeColumn(context, 'Fasting Starts', _formatTime(todaySched.fastHour, todaySched.fastMin)),
-                    _buildTimeColumn(context, 'Eating Starts', _formatTime(todaySched.eatHour, todaySched.eatMin)),
+                    _buildTimeColumn(context, 'Fasting Starts', _formatTime(activeSched.fastHour, activeSched.fastMin)),
+                    _buildTimeColumn(context, 'Eating Starts', _formatTime(activeSched.eatHour, activeSched.eatMin)),
                     _buildTimeColumn(
                       context,
                       'Fasting Target',
-                      '${(24.0 - _getEatingMinutes(DateTime.now().weekday, state.schedule) / 60.0).toStringAsFixed(1).replaceAll('.0', '')}h',
+                      '${(24.0 - _getEatingMinutes(activeWeekday, state.schedule) / 60.0).toStringAsFixed(1).replaceAll('.0', '')}h',
                     ),
                   ],
                 ),

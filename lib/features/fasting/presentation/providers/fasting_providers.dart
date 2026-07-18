@@ -47,10 +47,12 @@ class FastingStateNotifier extends Notifier<FastingState?> {
   void logManualAction(String status) {
     final engine = ref.read(fastingEngineProvider);
     final now = DateTime.now();
-    final schedule = HiveService.instance.fastingSchedule;
-    final active = engine.getActiveWindow(now, schedule);
+    final currentState = engine.currentState;
+    if (currentState == null) return;
 
-    final existing = _getRecordForDay(active.cycleStartDate);
+    final expectedStart = currentState.activeWindowStart;
+
+    final existing = engine.getRecordForSession(expectedStart);
     if (existing != null) {
       existing.status = status;
       if (status == 'completed') {
@@ -58,14 +60,14 @@ class FastingStateNotifier extends Notifier<FastingState?> {
       }
       HiveService.instance.saveFastingRecord(existing);
     } else {
-      final duration = active.endTime.difference(active.startTime).inMinutes;
+      final duration = currentState.activeWindowEnd.difference(expectedStart).inMinutes;
       final record = FastingRecord(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         planName: 'Daily Schedule',
         fastingMinutes: duration,
         eatingMinutes: 24 * 60 - duration,
-        startTime: active.startTime,
-        endTime: status == 'completed' ? now : active.endTime,
+        startTime: expectedStart,
+        endTime: status == 'completed' ? now : currentState.activeWindowEnd,
         status: status,
       );
       HiveService.instance.saveFastingRecord(record);
@@ -92,18 +94,6 @@ class FastingStateNotifier extends Notifier<FastingState?> {
       final engine = ref.read(fastingEngineProvider);
       engine.onRecordChanged();
     }
-  }
-
-  FastingRecord? _getRecordForDay(DateTime date) {
-    final records = HiveService.instance.allFastingRecords;
-    for (final r in records) {
-      if (r.startTime.year == date.year &&
-          r.startTime.month == date.month &&
-          r.startTime.day == date.day) {
-        return r;
-      }
-    }
-    return null;
   }
 }
 

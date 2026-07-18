@@ -4,275 +4,178 @@
     android:layout_height="256dp"
     android:orientation="vertical"
     android:background="@color/widget_background"
-    android:padding="12dp">
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="14dp"
+    android:paddingBottom="14dp"
+    android:gravity="center_horizontal">
 
-    <!-- Header Row -->
-    <RelativeLayout
+    <!-- Top Section: Start and End Times -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp">
+        android:orientation="horizontal"
+        android:layout_marginBottom="12dp">
 
-        <ImageView
-            android:id="@+id/notification_app_icon"
-            android:layout_width="16dp"
-            android:layout_height="16dp"
-            android:layout_centerVertical="true"
-            android:src="@mipmap/ic_launcher" />
-
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_toEndOf="@id/notification_app_icon"
-            android:layout_marginStart="6dp"
-            android:layout_centerVertical="true"
-            android:text="Fomo IF"
-            android:textColor="@color/widget_text_secondary"
-            android:textSize="10sp"
-            android:textStyle="bold" />
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="start">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Start Fast"
+                android:textColor="@color/widget_text_secondary"
+                android:textSize="11sp"
+                android:fontFamily="sans-serif-medium" />
+            <TextView
+                android:id="@+id/notification_start_time_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Fri, 16:00"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium"
+                android:textStyle="bold"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
 
-        <TextView
-            android:id="@+id/notification_expanded_status"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
-            android:text="FASTING"
-            android:textColor="@color/state_fasting"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-    </RelativeLayout>
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="end">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Eating Starts"
+                android:textColor="@color/widget_text_secondary"
+                android:textSize="11sp"
+                android:fontFamily="sans-serif-medium" />
+            <TextView
+                android:id="@+id/notification_end_time_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Sat, 15:00"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium"
+                android:textStyle="bold"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+    </LinearLayout>
 
-    <!-- Main Large Timer -->
+    <!-- Spacer to vertically distribute contents -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Countdown Timer (Stopwatch-style) -->
     <TextView
         android:id="@+id/notification_expanded_timer"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:gravity="center"
-        android:text="15:24:18"
+        android:text="04:22:18"
         android:textColor="@color/widget_text_primary"
-        android:textSize="26sp"
+        android:textSize="38sp"
+        android:fontFamily="sans-serif-medium"
+        android:textStyle="bold"
+        android:includeFontPadding="false"
+        android:gravity="center" />
+
+    <!-- Current Status -->
+    <TextView
+        android:id="@+id/notification_expanded_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🌙 FASTING"
+        android:textColor="@color/widget_text_primary"
+        android:textSize="12sp"
+        android:fontFamily="sans-serif-medium"
         android:textStyle="bold"
         android:layout_marginTop="2dp"
-        android:layout_marginBottom="2dp" />
+        android:gravity="center" />
 
-    <!-- Progress Bar -->
-    <ImageView
+    <!-- Thin horizontal progress bar -->
+    <ProgressBar
         android:id="@+id/notification_expanded_progress"
+        style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="8dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="8dp"
-        android:scaleType="fitXY"
-        android:contentDescription="Progress Bar" />
+        android:layout_height="5dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="6dp"
+        android:max="100"
+        android:progress="0" />
 
-    <!-- Info Grid (Elapsed, Remaining, Next, Schedule) -->
-    <LinearLayout
-        android:layout_width="match_parent"
+    <!-- Secondary Info Line (Single Line only) -->
+    <TextView
+        android:id="@+id/notification_secondary_info_text"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="8dp">
+        android:text="Elapsed 18h 38m • Goal 23h"
+        android:textColor="@color/widget_text_secondary"
+        android:textSize="11sp"
+        android:fontFamily="sans-serif"
+        android:gravity="center"
+        android:layout_marginBottom="8dp" />
 
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Elapsed"
-                android:textColor="@color/widget_text_secondary"
-                android:textSize="9sp" />
-
-            <TextView
-                android:id="@+id/notification_elapsed_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="15h 24m"
-                android:textColor="@color/widget_text_primary"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Remaining"
-                android:textColor="@color/widget_text_secondary"
-                android:textSize="9sp" />
-
-            <TextView
-                android:id="@+id/notification_remaining_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="36m"
-                android:textColor="@color/widget_text_primary"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1.8"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Next Transition"
-                android:textColor="@color/widget_text_secondary"
-                android:textSize="9sp" />
-
-            <TextView
-                android:id="@+id/notification_next_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Eating starts at 09:00"
-                android:textColor="@color/widget_text_primary"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1.2"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Today's Schedule"
-                android:textColor="@color/widget_text_secondary"
-                android:textSize="9sp" />
-
-            <TextView
-                android:id="@+id/notification_schedule_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="17:00 → 09:00"
-                android:textColor="@color/widget_text_primary"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <!-- Body Stats Strip -->
-    <LinearLayout
+    <!-- Spacer to vertically distribute contents -->
+    <View
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:background="@drawable/widget_card_bg"
-        android:padding="6dp"
-        android:layout_marginBottom="12dp"
-        android:gravity="center">
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
-        <TextView
-            android:id="@+id/notification_weight_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Weight: 78.4 kg"
-            android:textColor="@color/widget_text_primary"
-            android:textSize="10sp" />
-
-        <FrameLayout
-            android:layout_width="1dp"
-            android:layout_height="12dp"
-            android:background="@color/widget_divider"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp" />
-
-        <TextView
-            android:id="@+id/notification_body_fat_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Body Fat: 16.2%"
-            android:textColor="@color/widget_text_primary"
-            android:textSize="10sp" />
-
-        <FrameLayout
-            android:layout_width="1dp"
-            android:layout_height="12dp"
-            android:background="@color/widget_divider"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp" />
-
-        <TextView
-            android:id="@+id/notification_streak_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Streak: 5 Days"
-            android:textColor="@color/widget_text_primary"
-            android:textSize="10sp" />
-    </LinearLayout>
-
-    <!-- Quick Actions Row -->
+    <!-- Action Buttons Row -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="32dp"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:gravity="center">
 
         <TextView
-            android:id="@+id/notification_action_dashboard"
+            android:id="@+id/notification_action_complete"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.2"
+            android:background="@drawable/widget_btn_bg"
+            android:gravity="center"
+            android:text="✓ Complete Fast"
+            android:textColor="@color/widget_text_primary"
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-medium"
+            android:textStyle="bold"
+            android:layout_marginEnd="6dp" />
+
+        <TextView
+            android:id="@+id/notification_action_skip"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@drawable/widget_btn_bg"
             android:gravity="center"
-            android:text="Dashboard"
+            android:text="✕ Skip Window"
             android:textColor="@color/widget_text_primary"
-            android:textSize="10sp"
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-medium"
             android:textStyle="bold"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginEnd="6dp" />
 
         <TextView
-            android:id="@+id/notification_action_weight"
+            android:id="@+id/notification_action_open"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_weight="0.8"
             android:background="@drawable/widget_btn_bg"
             android:gravity="center"
-            android:text="Log Weight"
+            android:text="Open App"
             android:textColor="@color/widget_text_primary"
-            android:textSize="10sp"
-            android:textStyle="bold"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp" />
-
-        <TextView
-            android:id="@+id/notification_action_schedule"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@drawable/widget_btn_bg"
-            android:gravity="center"
-            android:text="Edit Plan"
-            android:textColor="@color/widget_text_primary"
-            android:textSize="10sp"
-            android:textStyle="bold"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp" />
-
-        <TextView
-            android:id="@+id/notification_action_body"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1.1"
-            android:background="@drawable/widget_btn_bg"
-            android:gravity="center"
-            android:text="Body Comp"
-            android:textColor="@color/widget_text_primary"
-            android:textSize="10sp"
-            android:textStyle="bold"
-            android:layout_marginStart="4dp" />
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-medium"
+            android:textStyle="bold" />
     </LinearLayout>
+
 </LinearLayout>

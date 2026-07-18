@@ -5,25 +5,33 @@
     android:background="@color/widget_background"
     android:paddingStart="16dp"
     android:paddingEnd="16dp"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp">
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
 
-    <!-- Status Indicator Icon -->
-    <ImageView
-        android:id="@+id/notification_status_icon"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
+    <!-- Status Indicator Icon Container (Rounded Badge) -->
+    <FrameLayout
+        android:id="@+id/notification_status_icon_container"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
         android:layout_centerVertical="true"
-        android:src="@drawable/ic_timer"
-        android:contentDescription="Status Icon" />
+        android:background="@drawable/widget_btn_bg"
+        android:padding="8dp">
 
-    <!-- Status Title -->
+        <ImageView
+            android:id="@+id/notification_status_icon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/ic_timer"
+            android:contentDescription="Status Icon" />
+    </FrameLayout>
+
+    <!-- Status Details -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_toEndOf="@id/notification_status_icon"
-        android:layout_marginStart="12dp"
+        android:layout_toEndOf="@id/notification_status_icon_container"
+        android:layout_marginStart="14dp"
         android:layout_centerVertical="true">
 
         <TextView
@@ -33,7 +41,10 @@
             android:text="FASTING"
             android:textColor="@color/widget_text_primary"
             android:textSize="12sp"
-            android:textStyle="bold" />
+            android:fontFamily="sans-serif-medium"
+            android:textStyle="bold"
+            android:singleLine="true"
+            android:ellipsize="end" />
 
         <TextView
             android:id="@+id/notification_subtitle"
@@ -41,7 +52,11 @@
             android:layout_height="wrap_content"
             android:text="36m remaining"
             android:textColor="@color/widget_text_secondary"
-            android:textSize="10sp" />
+            android:textSize="10sp"
+            android:fontFamily="sans-serif"
+            android:layout_marginTop="2dp"
+            android:singleLine="true"
+            android:ellipsize="end" />
     </LinearLayout>
 
     <!-- Large Timer Display on Right -->
@@ -53,15 +68,17 @@
         android:layout_centerVertical="true"
         android:text="15:24:18"
         android:textColor="@color/widget_text_primary"
-        android:textSize="20sp"
+        android:textSize="18sp"
+        android:fontFamily="monospace"
         android:textStyle="bold" />
 
     <!-- Tiny Progress Bar at the absolute bottom -->
-    <ImageView
+    <ProgressBar
         android:id="@+id/notification_progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
         android:layout_height="4dp"
         android:layout_alignParentBottom="true"
-        android:scaleType="fitXY"
-        android:contentDescription="Progress Bar" />
+        android:max="100"
+        android:progress="0" />
 </RelativeLayout>

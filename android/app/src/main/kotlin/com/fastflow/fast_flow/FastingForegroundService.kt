@@ -23,6 +23,13 @@ class FastingForegroundService : Service() {
     private val CHANNEL_ID = "fast_flow_ongoing_channel"
     private val NOTIFICATION_ID = 9001
 
+    private var lastTimerStr = ""
+    private var lastStatus = ""
+    private var lastProgressInt = -1
+    private var lastWeight = 0f
+    private var lastBodyFat = 0f
+    private var lastStreak = -1
+
     private val handler = Handler(Looper.getMainLooper())
     private val tickRunnable = object : Runnable {
         override fun run() {
@@ -149,6 +156,40 @@ class FastingForegroundService : Service() {
             "No transition scheduled"
         }
 
+        val timerStr = if (remainingSec > 0) {
+            WidgetHelper.formatCountdownMinutes(remainingSec)
+        } else {
+            "00:00"
+        }
+        val timerStrSeconds = if (remainingSec > 0) {
+            WidgetHelper.formatCountdown(remainingSec)
+        } else {
+            "00:00:00"
+        }
+
+        val progressInt = (progress * 100).toInt()
+
+        // Check if any visible value changed. If not, bypass rebuilding & notify() to optimize resource usage.
+        if (timerStrSeconds == lastTimerStr &&
+            status == lastStatus &&
+            progressInt == lastProgressInt &&
+            weight == lastWeight &&
+            bodyFat == lastBodyFat &&
+            streak == lastStreak
+        ) {
+            // No visible change. Re-trigger widget update just in case, then return early.
+            WidgetHelper.triggerWidgetUpdate(this)
+            return
+        }
+
+        // Cache the new values
+        lastTimerStr = timerStrSeconds
+        lastStatus = status
+        lastProgressInt = progressInt
+        lastWeight = weight
+        lastBodyFat = bodyFat
+        lastStreak = streak
+
         // Setup custom RemoteViews
         val collapsedViews = RemoteViews(packageName, R.layout.notification_collapsed)
         val expandedViews = RemoteViews(packageName, R.layout.notification_expanded)
@@ -168,46 +209,49 @@ class FastingForegroundService : Service() {
         collapsedViews.setTextViewText(R.id.notification_status_title, label)
         collapsedViews.setTextColor(R.id.notification_status_title, color)
         collapsedViews.setTextViewText(R.id.notification_subtitle, if (countdownEnabled) "$remainingStr remaining" else "Active")
-
-        val timerStr = if (remainingSec > 0) {
-            WidgetHelper.formatCountdown(remainingSec)
-        } else {
-            "00:00:00"
-        }
         collapsedViews.setTextViewText(R.id.notification_large_timer, timerStr)
 
         // Collapsed progress
-        val collapsedProgressBitmap = WidgetHelper.drawHorizontalProgressBar(this, progress, color)
-        collapsedViews.setImageViewBitmap(R.id.notification_progress_bar, collapsedProgressBitmap)
+        collapsedViews.setProgressBar(R.id.notification_progress_bar, 100, progressInt, false)
+
+        // Emoji status label for expanded layout
+        val emojiLabel = when (status) {
+            "FASTING" -> "🌙 FASTING"
+            "EATINGWINDOW", "EATING_WINDOW" -> "🍽 EATING WINDOW"
+            "PREPARING" -> "🍽 PREPARING"
+            "COMPLETED" -> "✓ COMPLETED"
+            "SKIPPED" -> "✕ SKIPPED"
+            "CANCELLED" -> "✕ CANCELLED"
+            else -> "🍽 EATING WINDOW"
+        }
 
         // Expanded texts
-        expandedViews.setTextViewText(R.id.notification_expanded_status, label)
+        expandedViews.setTextViewText(R.id.notification_expanded_status, emojiLabel)
         expandedViews.setTextColor(R.id.notification_expanded_status, color)
-        expandedViews.setTextViewText(R.id.notification_expanded_timer, timerStr)
+        expandedViews.setTextViewText(R.id.notification_expanded_timer, timerStrSeconds)
 
         // Expanded progress
-        val expandedProgressBitmap = WidgetHelper.drawHorizontalProgressBar(this, progress, color)
-        expandedViews.setImageViewBitmap(R.id.notification_expanded_progress, expandedProgressBitmap)
+        expandedViews.setProgressBar(R.id.notification_expanded_progress, 100, progressInt, false)
 
-        // Grid details
-        expandedViews.setTextViewText(R.id.notification_elapsed_text, elapsedStr)
-        expandedViews.setTextViewText(R.id.notification_remaining_text, remainingStr)
-        expandedViews.setTextViewText(R.id.notification_next_text, transitionTimeStr)
+        // Format dates for top section
+        val dayFormat = SimpleDateFormat("E, HH:mm", Locale.getDefault())
+        val startFormatted = if (startTimeMs > 0) dayFormat.format(Date(startTimeMs)) else "--, --:--"
+        val endFormatted = if (endTimeMs > 0) dayFormat.format(Date(endTimeMs)) else "--, --:--"
+        expandedViews.setTextViewText(R.id.notification_start_time_text, startFormatted)
+        expandedViews.setTextViewText(R.id.notification_end_time_text, endFormatted)
 
-        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-        val scheduleRangeStr = if (startTimeMs > 0 && endTimeMs > 0) {
-            "${timeFormat.format(Date(startTimeMs))} → ${timeFormat.format(Date(endTimeMs))}"
+        // Secondary Info line (Elapsed + Goal or Next Transition)
+        val secondaryInfoStr = if (status == "FASTING") {
+            val goalHours = (endTimeMs - startTimeMs) / 3600000
+            val goalStr = if ((endTimeMs - startTimeMs) % 3600000 == 0L) "${goalHours}h" else String.format(Locale.US, "%.1fh", (endTimeMs - startTimeMs).toFloat() / 3600000f)
+            "Elapsed $elapsedStr • Goal $goalStr"
         } else {
-            "--:-- → --:--"
+            val dfTime = SimpleDateFormat("HH:mm", Locale.getDefault())
+            val endFormattedTime = if (endTimeMs > 0) dfTime.format(Date(endTimeMs)) else "--:--"
+            val nextLabel = if (status == "FASTING") "Eating" else "Fasting"
+            "Next: $nextLabel at $endFormattedTime"
         }
-        expandedViews.setTextViewText(R.id.notification_schedule_text, scheduleRangeStr)
-
-        // Body Stats Strip
-        val weightStr = if (weight > 0) String.format(Locale.US, "Weight: %.1f kg", weight) else "Weight: --.- kg"
-        val bodyFatStr = if (bodyFat > 0) String.format(Locale.US, "Body Fat: %.1f%%", bodyFat) else "Body Fat: --.-%"
-        expandedViews.setTextViewText(R.id.notification_weight_text, weightStr)
-        expandedViews.setTextViewText(R.id.notification_body_fat_text, bodyFatStr)
-        expandedViews.setTextViewText(R.id.notification_streak_text, "Streak: $streak Days")
+        expandedViews.setTextViewText(R.id.notification_secondary_info_text, secondaryInfoStr)
 
         // Setup PendingIntents for actions
         val openIntent = PendingIntent.getActivity(
@@ -230,21 +274,10 @@ class FastingForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val logIntent = PendingIntent.getActivity(
-            this, 303,
-            Intent(this, MainActivity::class.java).apply {
-                action = "com.fastflow.action.NAVIGATE"
-                putExtra("route", "/body_composition")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         // Setup action listeners on RemoteViews buttons
-        expandedViews.setOnClickPendingIntent(R.id.notification_action_dashboard, openIntent)
-        expandedViews.setOnClickPendingIntent(R.id.notification_action_weight, logIntent)
-        expandedViews.setOnClickPendingIntent(R.id.notification_action_schedule, editIntent)
-        expandedViews.setOnClickPendingIntent(R.id.notification_action_body, logIntent)
+        expandedViews.setOnClickPendingIntent(R.id.notification_action_complete, editIntent)
+        expandedViews.setOnClickPendingIntent(R.id.notification_action_skip, editIntent)
+        expandedViews.setOnClickPendingIntent(R.id.notification_action_open, openIntent)
 
         // Build notification
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)

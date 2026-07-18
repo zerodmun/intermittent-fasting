@@ -4,9 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:fast_flow/core/providers/app_providers.dart';
-import 'package:fast_flow/core/theme/color_schemes.dart';
 import 'package:fast_flow/core/constants/app_spacing.dart';
-import 'package:fast_flow/core/constants/app_animations.dart';
 import 'package:fast_flow/core/extensions/context_extensions.dart';
 import 'package:fast_flow/core/extensions/duration_extensions.dart';
 import 'package:fast_flow/features/fasting/presentation/providers/fasting_providers.dart';
@@ -183,8 +181,6 @@ class HomeScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final isFasting = timerState.currentPhase == FastingPhase.fasting;
     final LinearGradient cardGradient;
-    final Color themeColor;
-
     String title = 'Fasting Active';
     String subtitle = 'Keep going! Your body is burning fat.';
 
@@ -193,19 +189,16 @@ class HomeScreen extends ConsumerWidget {
         title = 'Eating Window';
         subtitle = 'Enjoy healthy nutrients and fuel up.';
         cardGradient = context.colors.eatingGradient;
-        themeColor = context.colors.eatingActive;
         break;
       case FastingStatus.preparing:
         title = 'Preparing to Fast';
         subtitle = 'Your fasting phase will start shortly.';
         cardGradient = context.colors.preparingGradient;
-        themeColor = context.colors.preparingActive;
         break;
       case FastingStatus.completed:
         title = 'Fast Completed!';
         subtitle = 'Amazing job! You finished your scheduled fast.';
         cardGradient = context.colors.completedGradient;
-        themeColor = context.colors.completedActive;
         break;
       case FastingStatus.skipped:
         title = 'Fasting Skipped';
@@ -216,11 +209,9 @@ class HomeScreen extends ConsumerWidget {
             context.colorScheme.outlineVariant,
           ],
         );
-        themeColor = context.colorScheme.onSurfaceVariant;
         break;
       default:
         cardGradient = context.colors.fastingGradient;
-        themeColor = context.colors.fastingActive;
     }
 
     return Padding(
@@ -330,7 +321,8 @@ class HomeScreen extends ConsumerWidget {
 
   Widget _buildScheduleStrip(BuildContext context, FastingState timerState) {
     final theme = Theme.of(context);
-    final todaySched = timerState.schedule.getScheduleFor(DateTime.now().weekday);
+    final activeWeekday = timerState.activeWindowStart.weekday;
+    final activeSched = timerState.schedule.getScheduleFor(activeWeekday);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
@@ -351,7 +343,7 @@ class HomeScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Text(
-                  "Today's Plan",
+                  "Active Plan",
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: context.colorScheme.onSurface,
@@ -360,7 +352,7 @@ class HomeScreen extends ConsumerWidget {
               ],
             ),
             Text(
-              'Fasting: ${todaySched.fastTimeFormatted}  •  Eating: ${todaySched.eatTimeFormatted}',
+              'Fasting: ${activeSched.fastTimeFormatted}  •  Eating: ${activeSched.eatTimeFormatted}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: context.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
@@ -589,9 +581,9 @@ class HomeScreen extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SectionHeader(
-          title: 'Recent Fasts',
-          actionLabel: 'History',
-          onAction: () => context.go('/history'),
+          title: 'Recent History',
+          actionLabel: 'View Full History',
+          onAction: () => context.push('/home/history'),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
