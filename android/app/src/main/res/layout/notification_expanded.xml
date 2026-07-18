@@ -1,181 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="256dp"
-    android:orientation="vertical"
-    android:background="@color/widget_background"
-    android:paddingStart="16dp"
-    android:paddingEnd="16dp"
-    android:paddingTop="14dp"
-    android:paddingBottom="14dp"
-    android:gravity="center_horizontal">
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
 
-    <!-- Top Section: Start and End Times -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="12dp">
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="start">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Start Fast"
-                android:textColor="@color/widget_text_secondary"
-                android:textSize="11sp"
-                android:fontFamily="sans-serif-medium" />
-            <TextView
-                android:id="@+id/notification_start_time_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Fri, 16:00"
-                android:textColor="@color/widget_text_primary"
-                android:textSize="13sp"
-                android:fontFamily="sans-serif-medium"
-                android:textStyle="bold"
-                android:layout_marginTop="2dp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="end">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Eating Starts"
-                android:textColor="@color/widget_text_secondary"
-                android:textSize="11sp"
-                android:fontFamily="sans-serif-medium" />
-            <TextView
-                android:id="@+id/notification_end_time_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Sat, 15:00"
-                android:textColor="@color/widget_text_primary"
-                android:textSize="13sp"
-                android:fontFamily="sans-serif-medium"
-                android:textStyle="bold"
-                android:layout_marginTop="2dp" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <!-- Spacer to vertically distribute contents -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-    <!-- Countdown Timer (Stopwatch-style) -->
     <TextView
-        android:id="@+id/notification_expanded_timer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="04:22:18"
-        android:textColor="@color/widget_text_primary"
-        android:textSize="38sp"
-        android:fontFamily="sans-serif-medium"
-        android:textStyle="bold"
-        android:includeFontPadding="false"
-        android:gravity="center" />
+        android:text="Fomo IF" />
 
-    <!-- Current Status -->
     <TextView
         android:id="@+id/notification_expanded_status"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="🌙 FASTING"
-        android:textColor="@color/widget_text_primary"
-        android:textSize="12sp"
-        android:fontFamily="sans-serif-medium"
-        android:textStyle="bold"
-        android:layout_marginTop="2dp"
-        android:gravity="center" />
+        android:text="FASTING" />
 
-    <!-- Thin horizontal progress bar -->
-    <ProgressBar
-        android:id="@+id/notification_expanded_progress"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="5dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="6dp"
-        android:max="100"
-        android:progress="0" />
-
-    <!-- Secondary Info Line (Single Line only) -->
     <TextView
-        android:id="@+id/notification_secondary_info_text"
+        android:id="@+id/notification_expanded_timer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Elapsed 18h 38m • Goal 23h"
-        android:textColor="@color/widget_text_secondary"
-        android:textSize="11sp"
-        android:fontFamily="sans-serif"
-        android:gravity="center"
-        android:layout_marginBottom="8dp" />
+        android:text="04:20:00" />
 
-    <!-- Spacer to vertically distribute contents -->
-    <View
+    <ProgressBar
+        android:id="@+id/notification_expanded_progress"
+        style="@android:style/Widget.ProgressBar.Horizontal"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-    <!-- Action Buttons Row -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="32dp"
-        android:orientation="horizontal"
-        android:gravity="center">
-
-        <TextView
-            android:id="@+id/notification_action_complete"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1.2"
-            android:background="@drawable/widget_btn_bg"
-            android:gravity="center"
-            android:text="✓ Complete Fast"
-            android:textColor="@color/widget_text_primary"
-            android:textSize="11sp"
-            android:fontFamily="sans-serif-medium"
-            android:textStyle="bold"
-            android:layout_marginEnd="6dp" />
-
-        <TextView
-            android:id="@+id/notification_action_skip"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@drawable/widget_btn_bg"
-            android:gravity="center"
-            android:text="✕ Skip Window"
-            android:textColor="@color/widget_text_primary"
-            android:textSize="11sp"
-            android:fontFamily="sans-serif-medium"
-            android:textStyle="bold"
-            android:layout_marginEnd="6dp" />
-
-        <TextView
-            android:id="@+id/notification_action_open"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="0.8"
-            android:background="@drawable/widget_btn_bg"
-            android:gravity="center"
-            android:text="Open App"
-            android:textColor="@color/widget_text_primary"
-            android:textSize="11sp"
-            android:fontFamily="sans-serif-medium"
-            android:textStyle="bold" />
-    </LinearLayout>
+        android:layout_height="wrap_content"
+        android:max="100" />
 
 </LinearLayout>

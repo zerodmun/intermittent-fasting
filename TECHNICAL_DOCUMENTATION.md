@@ -105,14 +105,11 @@ Resolves active and transition states chronologically using a strict search orde
 
 The application uses an Android foreground service (`FastingForegroundService.kt`) with RemoteViews and custom XML layouts.
 
-### Redesigned Expanded Layout (`notification_expanded.xml`)
-We redesigned the expanded notification to look like a premium, typography-driven stopwatch widget:
-- **Top Section**: Plain text displaying schedule targets (`Start Fast` and `Eating Starts`) side-by-side. No heavy container cards or borders.
-- **Ticking Stopwatch**: Center-aligned bold ticking timer display showing seconds (`HH:mm:ss`).
-- **Emoji Status Text**: Centered accent color status label (e.g. `🌙 FASTING` / `🍽 EATING WINDOW`).
-- **Progress Line**: Thin horizontal progress bar.
-- **Single-Line Details**: Displays `Elapsed` and `Goal` times (for fasting) or next transition times (for eating).
-- **Actions**: Styled flat buttons:
-  - `✓ Complete Fast` (Deep links to `/home/fasting` timer)
-  - `✕ Skip Window` (Deep links to `/home/fasting` timer)
-  - `Open App` (Navigates to `/` dashboard)
+### Temporary Minimal Test Layout (`notification_expanded.xml`)
+For debugging and isolating RemoteViews compatibility issues, the expanded layout is temporarily replaced with a barebones structure containing only:
+- **Application Label**: Plain text displaying `"Fomo IF"`.
+- **Status Indicator**: Simple text display representing the current fasting phase (e.g. `FASTING`).
+- **Timer Display**: Simple TextView showing the remaining duration (`04:20:00`).
+- **Progress Indicator**: A standard horizontal `ProgressBar` utilizing the platform-concrete style `@android:style/Widget.ProgressBar.Horizontal`.
+
+All custom background colors, padding overrides, custom fonts, vector drawables, elevation settings, and action button deep links have been temporarily removed to achieve a clean baseline for isolation testing.

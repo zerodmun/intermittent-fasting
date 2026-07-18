@@ -41,7 +41,11 @@
             android:name=".FastingForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="fasting_countdown" />
+        </service>
 
         <!-- Notification Dismiss/Action Handler -->
         <receiver

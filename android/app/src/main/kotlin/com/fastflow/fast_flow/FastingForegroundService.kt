@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -34,7 +35,7 @@ class FastingForegroundService : Service() {
     private val tickRunnable = object : Runnable {
         override fun run() {
             updateNotificationAndWidgets()
-            handler.postDelayed(this, 1000)
+            handler.postDelayed(this, 60000) // Update progress/metadata every 60 seconds to save battery
         }
     }
 
@@ -51,7 +52,11 @@ class FastingForegroundService : Service() {
 
         // Start foreground immediately with a placeholder to satisfy Android OS timing requirements
         val notification = buildPlaceholderNotification()
-        startForeground(NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
 
         handler.removeCallbacks(tickRunnable)
         handler.post(tickRunnable)
@@ -233,26 +238,6 @@ class FastingForegroundService : Service() {
         // Expanded progress
         expandedViews.setProgressBar(R.id.notification_expanded_progress, 100, progressInt, false)
 
-        // Format dates for top section
-        val dayFormat = SimpleDateFormat("E, HH:mm", Locale.getDefault())
-        val startFormatted = if (startTimeMs > 0) dayFormat.format(Date(startTimeMs)) else "--, --:--"
-        val endFormatted = if (endTimeMs > 0) dayFormat.format(Date(endTimeMs)) else "--, --:--"
-        expandedViews.setTextViewText(R.id.notification_start_time_text, startFormatted)
-        expandedViews.setTextViewText(R.id.notification_end_time_text, endFormatted)
-
-        // Secondary Info line (Elapsed + Goal or Next Transition)
-        val secondaryInfoStr = if (status == "FASTING") {
-            val goalHours = (endTimeMs - startTimeMs) / 3600000
-            val goalStr = if ((endTimeMs - startTimeMs) % 3600000 == 0L) "${goalHours}h" else String.format(Locale.US, "%.1fh", (endTimeMs - startTimeMs).toFloat() / 3600000f)
-            "Elapsed $elapsedStr • Goal $goalStr"
-        } else {
-            val dfTime = SimpleDateFormat("HH:mm", Locale.getDefault())
-            val endFormattedTime = if (endTimeMs > 0) dfTime.format(Date(endTimeMs)) else "--:--"
-            val nextLabel = if (status == "FASTING") "Eating" else "Fasting"
-            "Next: $nextLabel at $endFormattedTime"
-        }
-        expandedViews.setTextViewText(R.id.notification_secondary_info_text, secondaryInfoStr)
-
         // Setup PendingIntents for actions
         val openIntent = PendingIntent.getActivity(
             this, 301,
@@ -263,21 +248,6 @@ class FastingForegroundService : Service() {
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
-        val editIntent = PendingIntent.getActivity(
-            this, 302,
-            Intent(this, MainActivity::class.java).apply {
-                action = "com.fastflow.action.NAVIGATE"
-                putExtra("route", "/home/fasting")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // Setup action listeners on RemoteViews buttons
-        expandedViews.setOnClickPendingIntent(R.id.notification_action_complete, editIntent)
-        expandedViews.setOnClickPendingIntent(R.id.notification_action_skip, editIntent)
-        expandedViews.setOnClickPendingIntent(R.id.notification_action_open, openIntent)
 
         // Build notification
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
