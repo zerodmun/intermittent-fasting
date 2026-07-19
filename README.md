@@ -42,10 +42,10 @@ A modern, offline-first Flutter application for intermittent fasting tracking an
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/beranda.png" width="180"/>
-  <img src="screenshots/bodyfat.png" width="180"/>
-  <img src="screenshots/soon.png" width="180"/>
-  <img src="screenshots/stats.png" width="180"/>
+  <img src="screenshots/beranda.png" width="170"/>
+  <img src="screenshots/bodyfat.png" width="170"/>
+  <img src="screenshots/soon.png" width="170"/>
+  <img src="screenshots/stats.png" width="170"/>
 </p>
 
 ---
