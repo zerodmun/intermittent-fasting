@@ -4,6 +4,21 @@ All notable changes to the **Fomo IF** project will be documented in this file. 
 
 ---
 
+## [0.5.0] — 2026-07-19
+### Added
+- **Food Module MVP**: Integrated Manual Food Search, Barcode Scanner, and Nutrition Saving.
+- **Persistent Local Storage**: Built offline-first local persistence utilizing Hive boxes.
+- **Statistics Integration**: Introduced "Total Calories Consumed" tracking syncing directly from Hive logs.
+- **Bilingual & Fallback Search**: Programmed a hybrid query system translating Indonesian food searches (e.g. `nasi` to `Rice`) with automated fallbacks to OpenFoodFacts V2 API endpoints.
+- **Relevance Scoring Engine**: Added title keyword scoring, noise filters, and completeness weighting to search results.
+- **Calorie Burn Estimator**: Implemented Mifflin-St Jeor real-time calorie burn estimator updating continuously during fasting windows.
+
+### Fixed
+- **Camera Navigation Intercept**: Added back-swipe and hardware back key intercepts on the scanner camera via `PopScope` to prevent unexpected application exit.
+- **Card Spacing & Layout Consistency**: Realigned statistic cards on Home and Statistics dashboards to left-aligned structures (Icon -> Value -> Title -> Subtitle) and ensured row layouts adapt heights naturally using `IntrinsicHeight` constraints.
+
+---
+
 ## [0.4.0] — 2026-07-17
 ### Added
 - **Global Rebranding**: Renamed application to **Fomo IF** across Dart, Kotlin, XML, and Info.plist layers.

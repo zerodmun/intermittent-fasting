@@ -113,3 +113,37 @@ For debugging and isolating RemoteViews compatibility issues, the expanded layou
 - **Progress Indicator**: A standard horizontal `ProgressBar` utilizing the platform-concrete style `@android:style/Widget.ProgressBar.Horizontal`.
 
 All custom background colors, padding overrides, custom fonts, vector drawables, elevation settings, and action button deep links have been temporarily removed to achieve a clean baseline for isolation testing.
+
+---
+
+## Food Module MVP
+
+The food module provides manual search, barcode scanning, and local persistence of nutrition logs.
+
+### Offline-First Architecture
+*   **Hive Persistence**: Food log entries are stored in a dedicated Hive box (`food_logs`) containing dates, times, barcodes, food names, calorie values, macronutrient values, and serving details.
+*   **Reactive State Streams**: The UI reactive elements (like total daily calories consumed) subscribe directly to watches on the Hive boxes to update instantly when items are added or removed.
+
+### Robust Search & Translation Logic
+*   **Indonesian-English Support**: User searches in Indonesian (e.g. `nasi`) are programmatically translated to English counterpart keys (e.g. `Rice`) and prioritized.
+*   **Dual-Query API Fallback**: Queries initially target Open Food Facts CGI V1 endpoints; if they fail or timeout, the service automatically falls back to search-v2 API endpoints.
+*   **Relevance Scoring**: Search results are filtered to remove non-food products (e.g., shampoo) and sorted using a descending relevance score prioritizing exact matches, brand-free titles, and complete nutritional facts.
+
+### Real-time Calorie Burn Estimator
+*   Uses the Mifflin-St Jeor equation to compute BMR based on user profiles (Age, Weight, Height, Gender).
+*   Estimates continuous calorie burn rate: `BMR / 1440` kcal/minute.
+*   Ticks every second while fasting and resets to 0 when the fasting window ends.
+
+### Spacing & Layout System
+*   **StatCard Widget**: One reusable widget enforcing a strictly left-aligned structure:
+    *   **Header**: Fixed `40dp` height row with a left-aligned icon and an optional right-aligned info button (does not collapse or reposition when empty).
+    *   **Main Value**: Displayed below the header using a `FittedBox` for responsive scaling without clipping/wrapping.
+    *   **Title**: Single line (no subtitle, `maxLines: 1`, `softWrap: false`, and `overflow: TextOverflow.ellipsis`).
+    *   **Spacing**: 16dp outer padding, 20dp header $\rightarrow$ value spacing, and 8dp value $\rightarrow$ title spacing.
+*   **Dynamic Height Alignment**: Uses `IntrinsicHeight` rows to dynamically match height configurations across same-row cards, ensuring consistent horizontal and vertical balance across differing device aspect ratios (phones, foldables, tablets).
+
+### Barcode Scanning Flow & Navigation
+*   **Nested Route Stack**: Barcode scanner camera screen (`BarcodeScannerPage` at `/food-scanner/camera`) and product details screen (`ProductResultScreen` at `/food-scanner/result`) are pushed onto the nested navigation stack under the `/food-scanner` parent route.
+*   **Lifecycle Management**: The camera stream and controller are initialized in `initState`, stopped (`_controller.stop()`) immediately upon barcode detection to prevent double scan triggers/API requests, and properly disposed in `dispose`.
+*   **Inline Loading & State Widgets**: To prevent a black screen preview after a barcode is successfully detected, the scanner screen dynamically renders loading, "Product Not Found", and offline error views inline, replacing the camera preview.
+*   **Safe Tab Navigation**: If a user presses back at the root of a tab other than Home, the app redirects to the Home tab (index 0). Exiting the app via a double back press (within 2 seconds) is only allowed on the Home tab. Added a custom SnackBar toast `"Press back again to exit"`.

@@ -25,6 +25,8 @@ dependencies:
   timezone: ^0.10.1
   flutter_svg: ^2.0.10-ap.1
   image_picker: ^1.2.3
+  http: ^1.6.0
+  mobile_scanner: ^7.3.0
 
 dev_dependencies:
   flutter_test:

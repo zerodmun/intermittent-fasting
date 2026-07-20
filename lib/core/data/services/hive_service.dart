@@ -22,6 +22,7 @@ class HiveService {
   static const String _settingsBox = 'settings';
   static const String _activeSessionBox = 'active_session';
   static const String _foodLogsBox = 'food_logs';
+  static const String _foodSearchCacheBox = 'food_search_cache';
 
   late Box<UserProfile> userProfileBox;
   late Box<FastingSchedule> fastingScheduleBox;
@@ -30,6 +31,7 @@ class HiveService {
   late Box settingsBox;
   late Box activeSessionBox;
   late Box foodLogsBox;
+  late Box foodSearchCacheBox;
 
   /// Initialize Hive and open all boxes safely
   Future<void> init() async {
@@ -55,6 +57,7 @@ class HiveService {
       _openBoxWithRecoveryAndFallback(_settingsBox),
       _openBoxWithRecoveryAndFallback(_activeSessionBox),
       _openBoxWithRecoveryAndFallback(_foodLogsBox),
+      _openBoxWithRecoveryAndFallback(_foodSearchCacheBox),
     ]);
 
     userProfileBox = opened[0] as Box<UserProfile>;
@@ -64,6 +67,7 @@ class HiveService {
     settingsBox = opened[4];
     activeSessionBox = opened[5];
     foodLogsBox = opened[6];
+    foodSearchCacheBox = opened[7];
   }
 
   void _registerAdapterSafe<T>(TypeAdapter<T> adapter) {
@@ -374,5 +378,6 @@ class HiveService {
     await settingsBox.clear();
     await activeSessionBox.clear();
     await foodLogsBox.clear();
+    await foodSearchCacheBox.clear();
   }
 }

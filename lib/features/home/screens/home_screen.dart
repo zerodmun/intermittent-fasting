@@ -70,7 +70,7 @@ class HomeScreen extends ConsumerWidget {
                     const SizedBox(height: AppSpacing.md),
                     _buildScheduleStrip(context, timerState),
                     const SizedBox(height: AppSpacing.md),
-                    _buildQuickStats(context, streak, timerState),
+                    _buildQuickStats(context, streak, timerState, profile),
                     const SizedBox(height: AppSpacing.md),
                     _buildBodyCompSummary(context, profile, weightAsync),
                     const SizedBox(height: AppSpacing.md),
@@ -368,39 +368,185 @@ class HomeScreen extends ConsumerWidget {
     BuildContext context,
     StreakResult streak,
     FastingState timerState,
+    UserProfile profile,
   ) {
+    // 1. Calculate Mifflin-St Jeor BMR
+    final isMale = profile.gender.toLowerCase() == 'male' || profile.gender.toLowerCase() == 'm';
+    final bmr = (10 * profile.weightKg) + (6.25 * profile.heightCm) - (5 * profile.ageYears) + (isMale ? 5 : -161);
+
+    // 2. Calculate calories burned during current fasting session
+    final isFasting = timerState.currentPhase == FastingPhase.fasting;
+    int estimatedCalories = 0;
+    if (isFasting) {
+      final currentFastingMinutes = timerState.elapsed.inSeconds / 60.0;
+      final caloriesPerMinute = bmr / 1440.0;
+      estimatedCalories = (caloriesPerMinute * currentFastingMinutes).round();
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
-      child: GridView.count(
-        crossAxisCount: 3,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisSpacing: AppSpacing.md,
-        mainAxisSpacing: AppSpacing.md,
-        childAspectRatio: 0.85,
-        children: [
-          StatCard(
-            icon: Icons.local_fire_department_rounded,
-            label: 'Day Streak',
-            value: '${streak.currentStreak}',
-            color: context.colors.eatingActive,
-          ),
-          StatCard(
-            icon: Icons.lock_clock,
-            label: 'Completed',
-            value: '${streak.totalCompleted}',
-            color: context.colors.completedActive,
-          ),
-          StatCard(
-            icon: Icons.insights_rounded,
-            label: 'Consistency',
-            value: streak.totalCompleted > 0
-                ? '${((streak.currentStreak / streak.totalCompleted.clamp(1, 100)) * 100).toInt()}%'
-                : '0%',
-            color: context.colorScheme.primary,
-          ),
-        ],
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: StatCard(
+                icon: Icons.local_fire_department_rounded,
+                title: 'Burned Calories',
+                value: '🔥 $estimatedCalories kcal',
+                iconColor: context.colors.eatingActive,
+                infoButton: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _showCaloriesInfoDialog(context, profile),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    child: Icon(
+                      Icons.info_outline_rounded,
+                      size: 16,
+                      color: context.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: StatCard(
+                icon: Icons.workspace_premium_rounded,
+                title: 'Day Streak',
+                value: '${streak.currentStreak}',
+                iconColor: context.colors.eatingActive,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: StatCard(
+                icon: Icons.check_circle_rounded,
+                title: 'Completed Fasts',
+                value: '${streak.totalCompleted}',
+                iconColor: context.colors.completedActive,
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  void _showCaloriesInfoDialog(BuildContext context, UserProfile profile) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+        final isMale = profile.gender.toLowerCase() == 'male' || profile.gender.toLowerCase() == 'm';
+        final bmr = (10 * profile.weightKg) + (6.25 * profile.heightCm) - (5 * profile.ageYears) + (isMale ? 5 : -161);
+
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusLg)),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: colorScheme.primary, size: AppSpacing.iconLg),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        'Calorie Burn Estimate',
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'The Calories Burned value is an estimate of energy expenditure during your current fasting session. It is not a direct medical measurement.',
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Basal Metabolic Rate (BMR)',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Calculated using the Mifflin-St Jeor Equation:',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        '• Gender: ${profile.gender}\n'
+                        '• Age: ${profile.ageYears} years\n'
+                        '• Height: ${profile.heightCm.round()} cm\n'
+                        '• Weight: ${profile.weightKg.round()} kg\n'
+                        '• Estimated BMR: ${bmr.round()} kcal/day',
+                        style: theme.textTheme.bodyMedium?.copyWith(height: 1.4, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'How it is calculated:',
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '1. BMR is divided by 1440 to estimate calories burned per minute.\n'
+                  '2. This rate is multiplied by the current fasting session duration (in minutes).\n'
+                  '3. The value resets to 0 when you break your fast.',
+                  style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                const Divider(),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'References',
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '• Mifflin MD, St Jeor ST, Hill LA, Scott BJ, Daugherty SA, Koh YO. '
+                  'A new predictive equation for resting energy expenditure in healthy individuals. '
+                  'American Journal of Clinical Nutrition. 1990.\n'
+                  '• Academy of Nutrition and Dietetics\n'
+                  '• National Institutes of Health (NIH)',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant.withOpacity(0.8),
+                    height: 1.4,
+                    fontSize: 10,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    ),
+                  ),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

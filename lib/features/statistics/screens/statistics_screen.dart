@@ -164,6 +164,7 @@ class StatisticsScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: AppSpacing.md),
               _buildStatsGrid(
                 context,
                 stats,
@@ -172,7 +173,9 @@ class StatisticsScreen extends ConsumerWidget {
                 avgFastFormatted,
                 theme,
               ),
+              const SizedBox(height: AppSpacing.md),
               const SectionHeader(title: 'This Week'),
+              const SizedBox(height: AppSpacing.xs),
               stats.totalSessions == 0
                   ? const Padding(
                       padding: EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding, vertical: AppSpacing.md),
@@ -190,7 +193,9 @@ class StatisticsScreen extends ConsumerWidget {
                       weeklyCompletionPercent,
                       theme,
                     ),
+              const SizedBox(height: AppSpacing.md),
               const SectionHeader(title: 'Monthly Trend'),
+              const SizedBox(height: AppSpacing.xs),
               stats.totalSessions == 0
                   ? const Padding(
                       padding: EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding, vertical: AppSpacing.md),
@@ -223,66 +228,81 @@ class StatisticsScreen extends ConsumerWidget {
     ThemeData theme,
   ) {
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.screenPadding),
-      child: GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisSpacing: AppSpacing.md,
-        mainAxisSpacing: AppSpacing.md,
-        childAspectRatio: 1.15,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+      child: Column(
         children: [
-          StatCard(
-            icon: Icons.local_fire_department_rounded,
-            label: 'Daily Calories',
-            value: '$dailyCalories kcal',
-            subtitle: 'Recommended daily intake',
-            color: theme.colorScheme.primary,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const NutritionDetailsScreen(),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: StatCard(
+                    icon: Icons.local_fire_department_rounded,
+                    title: 'Daily Calories',
+                    value: '$dailyCalories kcal',
+                    iconColor: theme.colorScheme.primary,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NutritionDetailsScreen(),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              );
-            },
-          ),
-          StatCard(
-            icon: Icons.restaurant_menu_rounded,
-            label: 'Total Calories Consumed',
-            value: '$totalFoodCalories kcal',
-            subtitle: 'From Food Scanner',
-            color: Colors.orangeAccent,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const FoodIntakeSummaryScreen(),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: StatCard(
+                    icon: Icons.restaurant_menu_rounded,
+                    title: 'Total Calories Consumed',
+                    value: '$totalFoodCalories kcal',
+                    iconColor: Colors.orangeAccent,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FoodIntakeSummaryScreen(),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              );
-            },
+              ],
+            ),
           ),
-          StatCard(
-            icon: Icons.timer_outlined,
-            label: 'Average Fast',
-            value: avgFastFormatted,
-            subtitle: 'Tap for details',
-            color: theme.colorScheme.secondary,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AverageFastDetailScreen(),
+          const SizedBox(height: AppSpacing.md),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: StatCard(
+                    icon: Icons.timer_outlined,
+                    title: 'Average Fast',
+                    value: avgFastFormatted,
+                    iconColor: theme.colorScheme.secondary,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AverageFastDetailScreen(),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              );
-            },
-          ),
-          StatCard(
-            icon: Icons.hourglass_empty_rounded,
-            label: 'Total Fasted',
-            value: '${stats.totalFastingHours.toStringAsFixed(1)}h',
-            subtitle: 'Cumulative hours',
-            color: theme.colorScheme.tertiary,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: StatCard(
+                    icon: Icons.hourglass_empty_rounded,
+                    title: 'Total Fasted',
+                    value: '${stats.totalFastingHours.toStringAsFixed(1)}h',
+                    iconColor: theme.colorScheme.tertiary,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

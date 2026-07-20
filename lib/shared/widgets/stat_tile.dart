@@ -19,9 +19,9 @@ class StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return StatCard(
       icon: icon,
-      label: label,
+      title: label,
       value: value,
-      color: color,
+      iconColor: color,
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,6 +12,9 @@ import 'package:fast_flow/features/weight/screens/weight_screen.dart';
 import 'package:fast_flow/features/body_composition/presentation/screens/body_comp_screen.dart';
 import 'package:fast_flow/features/body_composition/presentation/screens/progress_photos_screen.dart';
 import 'package:fast_flow/features/food_scanner/presentation/pages/food_scanner_screen.dart';
+import 'package:fast_flow/features/food_scanner/presentation/pages/barcode_scanner_screen.dart';
+import 'package:fast_flow/features/food_scanner/presentation/pages/product_result_screen.dart';
+import 'package:fast_flow/features/food_scanner/services/food_search_service.dart';
 import 'package:fast_flow/shared/widgets/app_scaffold.dart';
 
 /// App-wide route configuration using GoRouter with shell routing.
@@ -29,7 +33,14 @@ class AppRouter {
   static const String weight = '/weight';
   static const String bodyComposition = '/home/body-composition';
 
+  static final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> _foodScannerNavigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> _statisticsNavigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> _settingsNavigatorKey = GlobalKey<NavigatorState>();
+
   late final GoRouter router = GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: home,
     debugLogDiagnostics: false,
     redirect: (context, state) {
@@ -47,10 +58,17 @@ class AppRouter {
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
-          return AppScaffold(navigationShell: navigationShell);
+          return AppScaffold(
+            navigationShell: navigationShell,
+            homeKey: _homeNavigatorKey,
+            foodScannerKey: _foodScannerNavigatorKey,
+            statisticsKey: _statisticsNavigatorKey,
+            settingsKey: _settingsNavigatorKey,
+          );
         },
         branches: [
           StatefulShellBranch(
+            navigatorKey: _homeNavigatorKey,
             routes: [
               GoRoute(
                 path: home,
@@ -83,14 +101,29 @@ class AppRouter {
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: _foodScannerNavigatorKey,
             routes: [
               GoRoute(
                 path: foodScanner,
                 builder: (context, state) => const FoodScannerScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'camera',
+                    builder: (context, state) => const BarcodeScannerPage(),
+                  ),
+                  GoRoute(
+                    path: 'result',
+                    builder: (context, state) {
+                      final product = state.extra as FoodProduct;
+                      return ProductResultScreen(product: product);
+                    },
+                  ),
+                ],
               ),
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: _statisticsNavigatorKey,
             routes: [
               GoRoute(
                 path: statistics,
@@ -99,6 +132,7 @@ class AppRouter {
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: _settingsNavigatorKey,
             routes: [
               GoRoute(
                 path: settings,
