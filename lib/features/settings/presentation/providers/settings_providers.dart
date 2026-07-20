@@ -70,3 +70,43 @@ class DefaultPlanIdNotifier extends StateNotifier<String> {
     await HiveService.instance.setSetting('default_plan_id', planId);
   }
 }
+
+final eatingNotificationsEnabledProvider = StateNotifierProvider<EatingNotificationsEnabledNotifier, bool>((ref) {
+  return EatingNotificationsEnabledNotifier();
+});
+
+class EatingNotificationsEnabledNotifier extends StateNotifier<bool> {
+  EatingNotificationsEnabledNotifier() : super(true) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    final enabled = HiveService.instance.getSetting<bool>('eating_notification_enabled') ?? true;
+    state = enabled;
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = enabled;
+    await HiveService.instance.setSetting('eating_notification_enabled', enabled);
+  }
+}
+
+final fastingNotificationsEnabledProvider = StateNotifierProvider<FastingNotificationsEnabledNotifier, bool>((ref) {
+  return FastingNotificationsEnabledNotifier();
+});
+
+class FastingNotificationsEnabledNotifier extends StateNotifier<bool> {
+  FastingNotificationsEnabledNotifier() : super(true) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    final enabled = HiveService.instance.getSetting<bool>('fasting_notification_enabled') ?? true;
+    state = enabled;
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = enabled;
+    await HiveService.instance.setSetting('fasting_notification_enabled', enabled);
+  }
+}

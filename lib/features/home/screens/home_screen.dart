@@ -412,17 +412,8 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: StatCard(
-                icon: Icons.workspace_premium_rounded,
-                title: 'Day Streak',
-                value: '${streak.currentStreak}',
-                iconColor: context.colors.eatingActive,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: StatCard(
                 icon: Icons.check_circle_rounded,
-                title: 'Completed Fasts',
+                title: 'Completed',
                 value: '${streak.totalCompleted}',
                 iconColor: context.colors.completedActive,
               ),

@@ -25,8 +25,8 @@ Future<void> main() async {
 
   // Initialize services safely and concurrently with a timeout to ensure Splash Screen never hangs
   try {
+    await HiveService.instance.init();
     await Future.wait([
-      HiveService.instance.init(),
       NotificationService.instance.init(),
       WidgetSyncService.instance.initialize(),
     ]).timeout(const Duration(seconds: 4), onTimeout: () {

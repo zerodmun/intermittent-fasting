@@ -22,6 +22,8 @@ class SettingsScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final themeNotifier = ref.read(themeModeProvider.notifier);
     final notificationsEnabled = ref.watch(notificationsEnabledProvider);
+    final eatingNotificationsEnabled = ref.watch(eatingNotificationsEnabledProvider);
+    final fastingNotificationsEnabled = ref.watch(fastingNotificationsEnabledProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -89,25 +91,69 @@ class SettingsScreen extends ConsumerWidget {
 
           const SectionHeader(title: 'Notifications'),
           AppCard.elevated(
-            child: SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                'Enable Reminders',
-                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Text(
-                'Notify when fasting or eating windows transition.',
-                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-              ),
-              value: notificationsEnabled,
-              onChanged: (val) async {
-                ref.read(notificationsEnabledProvider.notifier).setEnabled(val);
-                if (val) {
-                  await NotificationService.instance.requestPermissions();
-                } else {
-                  await NotificationService.instance.cancelAll();
-                }
-              },
+            child: Column(
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Enable Notifications',
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Receive scheduled fasting and eating window transitions.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  value: notificationsEnabled,
+                  onChanged: (val) async {
+                    await ref.read(notificationsEnabledProvider.notifier).setEnabled(val);
+                    if (val) {
+                      final hasPerm = await NotificationService.instance.requestPermissions();
+                      if (hasPerm == false && context.mounted) {
+                        context.showSnack(
+                          'Notification permission is denied. You can enable it in system settings.',
+                          isError: true,
+                        );
+                      }
+                    } else {
+                      await NotificationService.instance.cancelAll();
+                    }
+                  },
+                ),
+                if (notificationsEnabled) ...[
+                  const Divider(),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      'Eating Window Notification',
+                      style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      'Notify when eating window starts.',
+                      style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
+                    value: eatingNotificationsEnabled,
+                    onChanged: (val) async {
+                      await ref.read(eatingNotificationsEnabledProvider.notifier).setEnabled(val);
+                    },
+                  ),
+                  const Divider(),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      'Fasting Started Notification',
+                      style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      'Notify when fasting begins.',
+                      style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
+                    value: fastingNotificationsEnabled,
+                    onChanged: (val) async {
+                      await ref.read(fastingNotificationsEnabledProvider.notifier).setEnabled(val);
+                    },
+                  ),
+                ],
+              ],
             ),
           ),
           const SizedBox(height: AppSpacing.md),

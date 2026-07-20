@@ -672,16 +672,16 @@ class _SearchFoodSheetState extends ConsumerState<_SearchFoodSheet> {
   void _showConfirmAddDialog(FoodProduct product) {
     final controller = TextEditingController(text: '1.0');
 
-    showDialog(
+    showDialog<bool>(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Add Food Entry'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(product.name, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-              if (product.brand.isNotEmpty) Text(product.brand, style: Theme.of(context).textTheme.bodySmall),
+              Text(product.name, style: Theme.of(dialogContext).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              if (product.brand.isNotEmpty) Text(product.brand, style: Theme.of(dialogContext).textTheme.bodySmall),
               const SizedBox(height: AppSpacing.md),
               AppInput(
                 label: 'Choose serving amount',
@@ -693,11 +693,11 @@ class _SearchFoodSheetState extends ConsumerState<_SearchFoodSheet> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 final qty = double.tryParse(controller.text) ?? 1.0;
                 if (qty > 0) {
                   final now = DateTime.now();
@@ -713,11 +713,21 @@ class _SearchFoodSheetState extends ConsumerState<_SearchFoodSheet> {
                     createdAt: now,
                   );
 
-                  ref.read(foodLogsProvider.notifier).addFoodLog(entry);
-                  Navigator.pop(context); // close confirm dialog
-                  Navigator.pop(context); // close bottom sheet
-                  widget.onFoodLogged();
-                  context.showSnack('Food added to diary', isSuccess: true);
+                  try {
+                    await ref.read(foodLogsProvider.notifier).addFoodLog(entry);
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext, true); // close confirm dialog with success
+                    }
+                  } catch (e) {
+                    if (dialogContext.mounted) {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to save food: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
                 }
               },
               child: const Text('Add'),
@@ -725,7 +735,15 @@ class _SearchFoodSheetState extends ConsumerState<_SearchFoodSheet> {
           ],
         );
       },
-    );
+    ).then((added) {
+      if (added == true) {
+        if (mounted) {
+          Navigator.pop(context); // close bottom sheet
+          widget.onFoodLogged();
+          context.showSnack('Food added to diary', isSuccess: true);
+        }
+      }
+    });
   }
 
   @override

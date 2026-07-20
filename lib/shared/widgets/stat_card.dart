@@ -57,7 +57,7 @@ class StatCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 20.0), // Spacing: Header -> Value: 20-24dp
+          const SizedBox(height: 26.0), // Spacing: Header -> Value: 26dp
           // Main Value
           FittedBox(
             fit: BoxFit.scaleDown,
