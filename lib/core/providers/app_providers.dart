@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:fast_flow/core/data/services/hive_service.dart';
+import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/core/helpers/streak_calculator.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';

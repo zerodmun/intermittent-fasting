@@ -4,6 +4,20 @@ All notable changes to the **Fomo IF** project will be documented in this file. 
 
 ---
 
+## [0.6.0] — 2026-07-20
+### Added
+- **Decomposed Home Screen Widgets**: Extracted legacy helper methods in `home_screen.dart` into modular reusable widgets under `lib/features/home/presentation/widgets/` (`HomeHeader`, `FastingProgressCard`, `NextAlarmCard`, `CaloriesCard`, `CompletedCard`).
+
+### Changed
+- **Standardized Clean Architecture Directory Structure**: Reorganized files to strictly follow feature-first structure (grouping views under `presentation/screens/` and providers under `presentation/providers/`).
+- **Refactored Food Scanner to Food Feature**: Replaced legacy `food_scanner` feature folder with a scalable layered `food` feature, splitting models, notifier providers, and screens.
+- **Centralized Global Services**: Consolidated and moved core services (such as `HiveService` and `FoodApiService`) under `lib/core/services/`.
+
+### Fixed
+- **Stability and Compile Correction**: Fixed capitalization on boolean constants (e.g. `False` -> `false`) and imported foundation and duration extensions correctly, restoring the application to a 100% stable compiling state.
+
+---
+
 ## [0.5.0] — 2026-07-19
 ### Added
 - **Food Module MVP**: Integrated Manual Food Search, Barcode Scanner, and Nutrition Saving.

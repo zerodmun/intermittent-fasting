@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:fast_flow/app.dart';
-import 'package:fast_flow/core/data/services/hive_service.dart';
+import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
 import 'package:fast_flow/core/services/notification_service.dart';
 import 'package:fast_flow/core/services/widget_sync_service.dart';

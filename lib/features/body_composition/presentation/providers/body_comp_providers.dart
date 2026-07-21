@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../onboarding/providers/onboarding_provider.dart';
-import '../../../weight/domain/entities/weight_entry.dart';
-import '../../../weight/presentation/providers/weight_providers.dart';
-import '../../data/services/body_comp_service.dart';
-import '../../domain/entities/body_comp_result.dart';
-import '../../../../core/providers/app_providers.dart';
+import 'package:fast_flow/features/onboarding/presentation/providers/onboarding_provider.dart';
+import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
+import 'package:fast_flow/features/weight/presentation/providers/weight_providers.dart';
+import 'package:fast_flow/features/body_composition/data/services/body_comp_service.dart';
+import 'package:fast_flow/features/body_composition/domain/entities/body_comp_result.dart';
+import 'package:fast_flow/core/providers/app_providers.dart';
 
 /// Provider for list of weight entries, watching weightProvider reactively.
 final bodyCompEntriesProvider = Provider<List<WeightEntry>>((ref) {

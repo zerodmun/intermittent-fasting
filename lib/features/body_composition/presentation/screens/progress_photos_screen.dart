@@ -5,12 +5,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/constants/app_spacing.dart';
-import '../../../../core/constants/app_animations.dart';
-import '../../../../core/extensions/context_extensions.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/app_button.dart';
-import '../../../../shared/widgets/empty_state.dart';
+import 'package:fast_flow/core/constants/app_spacing.dart';
+import 'package:fast_flow/core/constants/app_animations.dart';
+import 'package:fast_flow/core/extensions/context_extensions.dart';
+import 'package:fast_flow/shared/widgets/app_card.dart';
+import 'package:fast_flow/shared/widgets/app_button.dart';
+import 'package:fast_flow/shared/widgets/empty_state.dart';
 
 class ProgressPhotosScreen extends StatefulWidget {
   const ProgressPhotosScreen({super.key});

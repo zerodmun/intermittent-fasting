@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
-import 'package:fast_flow/core/data/services/hive_service.dart';
+import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
 import 'package:fast_flow/features/weight/domain/entities/body_comp_result.dart';
 import 'package:fast_flow/features/weight/data/services/body_comp_calculator.dart';

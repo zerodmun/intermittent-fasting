@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_spacing.dart';
-import '../../../../core/extensions/context_extensions.dart';
-import '../../domain/entities/body_fat_category.dart';
+import 'package:fast_flow/core/constants/app_spacing.dart';
+import 'package:fast_flow/core/extensions/context_extensions.dart';
+import 'package:fast_flow/features/body_composition/domain/entities/body_fat_category.dart';
 
 class BodyFatCategoryBadge extends StatelessWidget {
   final BodyFatCategory category;

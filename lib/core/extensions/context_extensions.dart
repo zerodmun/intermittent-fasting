@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme_extensions.dart';
-import '../theme/color_schemes.dart';
+import 'package:fast_flow/core/theme/app_theme_extensions.dart';
+import 'package:fast_flow/core/theme/color_schemes.dart';
 
 extension ContextExtensions on BuildContext {
   TextTheme get textTheme => Theme.of(this).textTheme;

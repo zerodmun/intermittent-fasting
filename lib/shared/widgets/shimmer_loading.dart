@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/constants/app_animations.dart';
+import 'package:fast_flow/core/constants/app_animations.dart';
 
 class ShimmerLoading extends StatefulWidget {
   final double width;

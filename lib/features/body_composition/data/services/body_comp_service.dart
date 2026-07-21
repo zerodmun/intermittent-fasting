@@ -1,7 +1,7 @@
 import 'dart:math';
-import '../../../onboarding/domain/entities/user_profile.dart';
-import '../../domain/entities/body_comp_result.dart';
-import '../../domain/entities/body_fat_category.dart';
+import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
+import 'package:fast_flow/features/body_composition/domain/entities/body_comp_result.dart';
+import 'package:fast_flow/features/body_composition/domain/entities/body_fat_category.dart';
 
 /// Service class responsible for computing body composition parameters.
 /// 

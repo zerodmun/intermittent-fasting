@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
-import 'package:fast_flow/core/data/services/hive_service.dart';
+import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
 
 class NotificationService {
@@ -32,10 +32,17 @@ class NotificationService {
       );
 
       try {
-        await _notifications.initialize(initSettings);
+        await _notifications.initialize(
+          initSettings,
+          onDidReceiveNotificationResponse: (response) {
+            if (kDebugMode) {
+              debugPrint('[NotificationService] Notification fired: ID ${response.id}');
+            }
+          },
+        );
       } catch (iconError) {
         assert(() {
-          print('NotificationService: Failed initializing with primary icon: $iconError');
+          debugPrint('NotificationService: Failed initializing with primary icon: $iconError');
           return true;
         }());
         const fallbackAndroidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -43,7 +50,14 @@ class NotificationService {
           android: fallbackAndroidInit,
           iOS: iosInit,
         );
-        await _notifications.initialize(fallbackInitSettings);
+        await _notifications.initialize(
+          fallbackInitSettings,
+          onDidReceiveNotificationResponse: (response) {
+            if (kDebugMode) {
+              debugPrint('[NotificationService] Notification fired: ID ${response.id}');
+            }
+          },
+        );
       }
 
       // Automatically reschedule on schedule changes
@@ -62,11 +76,25 @@ class NotificationService {
 
       _initialized = true;
 
+      // Verify/Request notification permission status and log
+      final enabled = HiveService.instance.getSetting<bool>('notifications_enabled') ?? true;
+      if (enabled) {
+        await requestPermissions();
+      } else {
+        if (kDebugMode) {
+          debugPrint('[NotificationService] Permission status: disabled in settings');
+        }
+      }
+
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Notification service initialized');
+      }
+
       // Schedule initially on startup
       await scheduleFastingNotifications();
     } catch (e, stackTrace) {
       assert(() {
-        print('NotificationService: Critical initialization failure: $e\n$stackTrace');
+        debugPrint('NotificationService: Critical initialization failure: $e\n$stackTrace');
         return true;
       }());
     }
@@ -75,20 +103,29 @@ class NotificationService {
   void _configureLocalTimeZone() {
     try {
       tz.initializeTimeZones();
-      final offset = DateTime.now().timeZoneOffset;
-      final hours = offset.inHours;
-      final sign = hours >= 0 ? '-' : '+';
-      final absHours = hours.abs();
-      final gmtName = 'Etc/GMT$sign$absHours';
-      try {
-        final loc = tz.getLocation(gmtName);
-        tz.setLocalLocation(loc);
-      } catch (_) {
+      final offsetMs = DateTime.now().timeZoneOffset.inMilliseconds;
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      
+      String? matchedLocation;
+      for (final entry in tz.timeZoneDatabase.locations.entries) {
+        final loc = entry.value;
+        if (loc.timeZone(nowMs).offset == offsetMs) {
+          matchedLocation = entry.key;
+          break;
+        }
+      }
+      
+      if (matchedLocation != null) {
+        tz.setLocalLocation(tz.getLocation(matchedLocation));
+      } else {
         tz.setLocalLocation(tz.UTC);
+      }
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Timezone configured: ${tz.local.name}');
       }
     } catch (e) {
       assert(() {
-        print('NotificationService: Failed to configure local timezone: $e');
+        debugPrint('NotificationService: Failed to configure local timezone: $e');
         return true;
       }());
     }
@@ -96,25 +133,28 @@ class NotificationService {
 
   Future<bool?> requestPermissions() async {
     try {
+      bool? status;
       if (Platform.isAndroid) {
         final androidNotifications = _notifications
             .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-        return await androidNotifications?.requestNotificationsPermission();
+        status = await androidNotifications?.requestNotificationsPermission();
       } else if (Platform.isIOS) {
         final iosNotifications = _notifications
             .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
-        return await iosNotifications?.requestPermissions(
+        status = await iosNotifications?.requestPermissions(
           alert: true,
           badge: true,
           sound: true,
         );
       }
-      return false;
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Permission status: $status');
+      }
+      return status ?? false;
     } catch (e) {
-      assert(() {
-        print('NotificationService: Failed requesting permissions: $e');
-        return true;
-      }());
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Failed requesting permissions: $e');
+      }
       return false;
     }
   }
@@ -122,14 +162,23 @@ class NotificationService {
   Future<void> scheduleFastingNotifications() async {
     try {
       await _notifications.cancelAll();
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Notification cancelled');
+      }
 
       final enabled = HiveService.instance.getSetting<bool>('notifications_enabled') ?? true;
       if (!enabled) {
+        if (kDebugMode) {
+          debugPrint('[NotificationService] Reschedule completed: notifications disabled');
+        }
         return;
       }
 
-      final schedule = HiveService.instance.fastingScheduleBox.get('schedule');
+      final FastingSchedule? schedule = HiveService.instance.fastingScheduleBox.get('schedule');
       if (schedule == null) {
+        if (kDebugMode) {
+          debugPrint('[NotificationService] Reschedule completed: no schedule found');
+        }
         return;
       }
 
@@ -143,8 +192,8 @@ class NotificationService {
         if (fastingEnabled) {
           await _scheduleDailyNotification(
             id: day * 2 - 1,
-            title: '🌙 Fasting Started',
-            body: 'Your fasting timer has started.\nStay hydrated and keep going!',
+            title: '🌙 Time to Fast',
+            body: 'Your fasting session has started.\nStay hydrated and keep going.',
             hour: daySched.fastHour,
             minute: daySched.fastMin,
             weekday: day,
@@ -155,19 +204,21 @@ class NotificationService {
         if (eatingEnabled) {
           await _scheduleDailyNotification(
             id: day * 2,
-            title: '🍽 Eating Window Started',
-            body: 'Your eating window is now open.\nRemember to eat balanced meals and stay hydrated.',
+            title: '🍽 Time to Eat',
+            body: 'Your eating window has started.\nEnjoy your meal and stay within your calorie goal.',
             hour: daySched.eatHour,
             minute: daySched.eatMin,
             weekday: day,
           );
         }
       }
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Reschedule completed');
+      }
     } catch (e) {
-      assert(() {
-        print('NotificationService: Failed scheduling notifications: $e');
-        return true;
-      }());
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Failed scheduling notifications: $e');
+      }
     }
   }
 
@@ -193,6 +244,8 @@ class NotificationService {
             channelDescription: 'Notifications for fasting and eating windows',
             importance: Importance.high,
             priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
           ),
           iOS: DarwinNotificationDetails(
             presentAlert: true,
@@ -204,11 +257,13 @@ class NotificationService {
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       );
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Notification scheduled: ID $id at $scheduledDate');
+      }
     } catch (e) {
-      assert(() {
-        print('NotificationService: Failed scheduling daily notification ID $id: $e');
-        return true;
-      }());
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Failed scheduling daily notification ID $id: $e');
+      }
     }
   }
 
@@ -236,11 +291,13 @@ class NotificationService {
   Future<void> cancelAll() async {
     try {
       await _notifications.cancelAll();
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Notification cancelled');
+      }
     } catch (e) {
-      assert(() {
-        print('NotificationService: Failed to cancel all notifications: $e');
-        return true;
-      }());
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Failed to cancel all notifications: $e');
+      }
     }
   }
 }

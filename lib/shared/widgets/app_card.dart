@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/constants/app_spacing.dart';
+import 'package:fast_flow/core/constants/app_spacing.dart';
 
 enum AppCardVariant { standard, elevated, outlined, gradient }
 

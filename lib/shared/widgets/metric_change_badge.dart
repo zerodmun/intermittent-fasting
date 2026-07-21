@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/constants/app_spacing.dart';
-import '../../core/extensions/context_extensions.dart';
+import 'package:fast_flow/core/constants/app_spacing.dart';
+import 'package:fast_flow/core/extensions/context_extensions.dart';
 
 class MetricChangeBadge extends StatelessWidget {
   final double change;

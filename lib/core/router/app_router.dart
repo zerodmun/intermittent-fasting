@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:fast_flow/features/fasting/screens/fasting_screen.dart';
-import 'package:fast_flow/features/history/screens/history_screen.dart';
-import 'package:fast_flow/features/home/screens/home_screen.dart';
-import 'package:fast_flow/features/onboarding/screens/onboarding_screen.dart';
-import 'package:fast_flow/features/settings/screens/settings_screen.dart';
-import 'package:fast_flow/features/statistics/screens/statistics_screen.dart';
-import 'package:fast_flow/features/weight/screens/weight_screen.dart';
+import 'package:fast_flow/features/fasting/presentation/screens/fasting_screen.dart';
+import 'package:fast_flow/features/history/presentation/screens/history_screen.dart';
+import 'package:fast_flow/features/home/presentation/screens/home_screen.dart';
+import 'package:fast_flow/features/onboarding/presentation/screens/onboarding_screen.dart';
+import 'package:fast_flow/features/settings/presentation/screens/settings_screen.dart';
+import 'package:fast_flow/features/statistics/presentation/screens/statistics_screen.dart';
+import 'package:fast_flow/features/weight/presentation/screens/weight_screen.dart';
 import 'package:fast_flow/features/body_composition/presentation/screens/body_comp_screen.dart';
 import 'package:fast_flow/features/body_composition/presentation/screens/progress_photos_screen.dart';
-import 'package:fast_flow/features/food_scanner/presentation/pages/food_scanner_screen.dart';
-import 'package:fast_flow/features/food_scanner/presentation/pages/barcode_scanner_screen.dart';
-import 'package:fast_flow/features/food_scanner/presentation/pages/product_result_screen.dart';
-import 'package:fast_flow/features/food_scanner/services/food_search_service.dart';
+import 'package:fast_flow/features/food/presentation/screens/food_scanner_screen.dart';
+import 'package:fast_flow/features/food/presentation/screens/barcode_scanner_screen.dart';
+import 'package:fast_flow/features/food/presentation/screens/product_result_screen.dart';
+import 'package:fast_flow/features/food/data/models/food_product.dart';
 import 'package:fast_flow/shared/widgets/app_scaffold.dart';
 
 /// App-wide route configuration using GoRouter with shell routing.

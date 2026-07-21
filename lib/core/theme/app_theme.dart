@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../constants/app_spacing.dart';
-import '../constants/app_typography.dart';
+import 'package:fast_flow/core/constants/app_spacing.dart';
+import 'package:fast_flow/core/constants/app_typography.dart';
 import 'color_schemes.dart';
 
 /// Centralized Application theme builder for FastFlow.

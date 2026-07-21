@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fast_flow/core/data/services/hive_service.dart';
+import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_state.dart';
 import 'package:fast_flow/features/fasting/data/services/fasting_engine.dart';
