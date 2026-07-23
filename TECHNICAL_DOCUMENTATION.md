@@ -124,18 +124,31 @@ These notifications are fully rescheduled dynamically whenever the user updates 
 
 ## Food Feature & API Integration
 
-The food module provides manual search, barcode scanning, and local persistence of nutrition logs.
+The food module provides manual search, barcode scanning, local persistence of nutrition logs, and an intelligent **Scan Real Food (AI)** vision scanner.
 
 ### Layered Architecture
-*   **Domain Models**: Stored in `lib/features/food/data/models/`:
+*   **Domain & Data Models**: Stored in `lib/features/food/data/models/`:
     - `food_product.dart`: Open Food Facts mapped structure (`FoodProduct` and `OfflineException`).
     - `food_log_entry.dart`: Saved meal logs (`FoodLogEntry`).
+    - `food_recognition_model.dart`: Structured nutritional result returned from the Gemini AI endpoint (`name`, `estimatedWeightG`, `calories`, `protein`, `fat`, `carbs`, `confidence`).
 *   **State Providers**: Stored in `lib/features/food/presentation/providers/`:
     - `food_logs_provider.dart`: `FoodLogsNotifier` StateNotifier handling add/update/delete.
+    - `food_recognition_provider.dart`: `FoodRecognitionNotifier` handling loading, result, and error states of Gemini recognition.
 *   **Views**: Stored in `lib/features/food/presentation/screens/`:
-    - `food_scanner_screen.dart`: List of logs and search action page.
+    - `food_scanner_screen.dart`: List of logs, search action page, and launch camera controls.
     - `barcode_scanner_screen.dart`: Controller-disposed scanner camera view.
     - `product_result_screen.dart`: Scanner details and saving prompt.
+    - `ai_camera_preview_screen.dart`: Preview Screen displaying captured food, managing retake cameras, presenting validation alerts, and displaying loading and detailed error dialogs.
+    - `ai_food_result_screen.dart`: AI scanner details, macronutrient progress indicators, and "Add to Diary" + "Analyze Another Photo" controls.
+
+### Gemini AI API & Resilient Scanner Strategy
+*   **Gemini Model**: Integrates the latest vision-capable `gemini-3.5-flash` model.
+*   **Centralized AI Exception System**: Defines `AIException` with mapped categories: `quotaExceeded` (429), `networkError` (SocketExceptions), `timeout` (408/TimeoutExceptions), `invalidApiKey` (401/403), `imageTooLarge` (>10 MB), `invalidResponse`, `serverError` (500/503), and `unknown`.
+*   **Automatic Retry strategy**: If a transient network error, timeout, or server error (500/503/408) is encountered, the service automatically retries the operation once after a 1-second delay. Non-transient errors (400, 401, 403, 404, 429) skip retries.
+*   **Connection Timeout Guard**: Imposes a 30-second execution limit on network requests to prevent infinite loading freezes.
+*   **Pre-Flight Image Validation**: UI validates file existence, checks readability, and restricts file sizes to under 10 MB before hitting the API.
+*   **Client-Side In-Memory Cache**: Centralized cache map inside `GeminiService` prevents redundant API calls if the same image path is submitted for analysis multiple times.
+*   **Safe Route Transitions**: Camera picker callbacks defer GoRouter page transitions until the next Flutter layout frame via `WidgetsBinding.instance.addPostFrameCallback`, eliminating race crashes.
 
 ### Indonesian-English Translation Support
 *   **Translation Mapping**: User searches in Indonesian (e.g. `nasi`) are programmatically translated to English counterpart keys (e.g. `Rice`) and prioritized.
