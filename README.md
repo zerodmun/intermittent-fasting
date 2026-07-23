@@ -46,19 +46,6 @@ A modern, offline-first Flutter application for intermittent fasting tracking an
 
 ---
 
-## Setup & Configuration
-
-### Gemini AI API Key
-The **Scan Real Food (AI)** scanner requires a Google Gemini API Key.
-1. Create a `.env` file in the root directory of the project.
-2. Add your API key:
-   ```env
-   GEMINI_API_KEY=your_actual_google_gemini_api_key_here
-   ```
-3. Run `flutter pub get` and build the application.
-
----
-
 ## Screenshots
 
 <p align="center">
