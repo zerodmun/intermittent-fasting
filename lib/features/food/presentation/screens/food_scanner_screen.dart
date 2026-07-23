@@ -43,8 +43,12 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
           final size = await file.length();
           LoggerService.d('[FoodScanner] Lost image file exists, size: $size bytes');
           if (mounted) {
-            LoggerService.d('[FoodScanner] Opening Preview for retrieved image via context.go');
-            context.go('/food-scanner/ai-preview', extra: path);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                LoggerService.d('[FoodScanner] Opening Preview for retrieved image via context.go');
+                context.go('/food-scanner/ai-preview', extra: path);
+              }
+            });
           }
         } else {
           LoggerService.d('[FoodScanner] Lost image file does not exist on disk');
@@ -93,8 +97,12 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
         await Future.delayed(const Duration(milliseconds: 600));
 
         if (context.mounted) {
-          LoggerService.d('[FoodScanner] Opening Preview via context.go');
-          context.go('/food-scanner/ai-preview', extra: image.path);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) {
+              LoggerService.d('[FoodScanner] Opening Preview via context.go');
+              context.go('/food-scanner/ai-preview', extra: image.path);
+            }
+          });
         } else {
           LoggerService.w('[FoodScanner] Context not mounted after camera exit');
         }

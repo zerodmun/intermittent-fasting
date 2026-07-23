@@ -6,9 +6,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:fast_flow/core/constants/app_spacing.dart';
 import 'package:fast_flow/shared/widgets/app_button.dart';
 import 'package:fast_flow/shared/widgets/app_card.dart';
+import 'package:fast_flow/shared/widgets/app_dialog.dart';
 import 'package:fast_flow/shared/widgets/shimmer_loading.dart';
 import 'package:fast_flow/features/food/presentation/providers/food_recognition_provider.dart';
-
+import 'package:fast_flow/core/services/gemini_service.dart';
 import 'package:fast_flow/core/services/logger_service.dart';
 
 class AiCameraPreviewScreen extends ConsumerStatefulWidget {
@@ -68,6 +69,7 @@ class _AiCameraPreviewScreenState extends ConsumerState<AiCameraPreviewScreen> {
         } catch (e, s) {
           LoggerService.e('[PreviewScreen] Exception in resetting provider during retake', e, s);
         }
+        if (!mounted) return;
         setState(() {
           _currentImagePath = image.path;
         });
@@ -92,6 +94,30 @@ class _AiCameraPreviewScreenState extends ConsumerState<AiCameraPreviewScreen> {
       return;
     }
 
+    // 10. Image Validation before upload: check existence, readability, size (< 10 MB)
+    final file = File(_currentImagePath);
+    final exists = await file.exists();
+    if (!mounted) return;
+    if (!exists) {
+      _showValidationErrorDialog(context, 'Image file does not exist.');
+      return;
+    }
+
+    try {
+      await file.readAsBytes();
+    } catch (e) {
+      if (!mounted) return;
+      _showValidationErrorDialog(context, 'Image file is not readable.');
+      return;
+    }
+
+    final size = await file.length();
+    if (!mounted) return;
+    if (size > 10 * 1024 * 1024) {
+      _showValidationErrorDialog(context, 'Image size exceeds the 10 MB limit.');
+      return;
+    }
+
     try {
       LoggerService.d('[PreviewScreen] Launching Gemini analysis for $_currentImagePath');
       final notifier = ref.read(foodRecognitionProvider.notifier);
@@ -100,6 +126,82 @@ class _AiCameraPreviewScreenState extends ConsumerState<AiCameraPreviewScreen> {
     } catch (e, stack) {
       LoggerService.e('[PreviewScreen] Exception during analyzeMeal recognize', e, stack);
     }
+  }
+
+  void _showValidationErrorDialog(BuildContext context, String message) {
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AppDialog(
+        title: 'Invalid Image',
+        content: message,
+        confirmLabel: 'OK',
+        onConfirm: () {
+          if (ctx.mounted) {
+            Navigator.of(ctx).pop();
+          }
+        },
+      ),
+    );
+  }
+
+  void _showErrorDialog(BuildContext context, Object error) {
+    if (!context.mounted) return;
+
+    String title = 'Analysis Error';
+    String message = 'An unexpected error occurred. Please try again.';
+
+    if (error is AIException) {
+      switch (error.type) {
+        case AIExceptionType.quotaExceeded:
+          title = 'AI Quota Reached';
+          message = 'The AI service has reached its usage limit. Please try again later.';
+          break;
+        case AIExceptionType.timeout:
+          title = 'Connection Timeout';
+          message = 'Please check your internet.';
+          break;
+        case AIExceptionType.networkError:
+          title = 'No Internet Connection';
+          message = 'Please check your internet connection and try again.';
+          break;
+        case AIExceptionType.serverError:
+          if (error.statusCode == 404) {
+            title = 'Gemini Model Not Found';
+            message = 'The specified AI model was not found. Please verify configuration.';
+          } else {
+            title = 'Gemini Server Error';
+            message = 'Please try again in a few minutes.';
+          }
+          break;
+        case AIExceptionType.invalidApiKey:
+          title = 'API Key Error';
+          message = 'AI service configuration is invalid.';
+          break;
+        case AIExceptionType.imageTooLarge:
+          title = 'Image Too Large';
+          message = 'Image size exceeds the 10 MB limit.';
+          break;
+        default:
+          break;
+      }
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AppDialog(
+        title: title,
+        content: message,
+        confirmLabel: 'OK',
+        onConfirm: () {
+          if (ctx.mounted) {
+            Navigator.of(ctx).pop();
+          }
+        },
+      ),
+    );
   }
 
   @override
@@ -118,15 +220,25 @@ class _AiCameraPreviewScreenState extends ConsumerState<AiCameraPreviewScreen> {
         LoggerService.d('[PreviewScreen] foodRecognitionProvider state transition: previous=$previous, next=$next');
         if (next is AsyncData) {
           final result = next.value;
-          if (result != null && mounted) {
+          if (result != null && context.mounted) {
             LoggerService.d('[PreviewScreen] Navigation target ready, opening Result Screen');
-            context.pushReplacement(
-              '/food-scanner/ai-result',
-              extra: {
-                'imagePath': _currentImagePath,
-                'result': result,
-              },
-            );
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) {
+                context.pushReplacement(
+                  '/food-scanner/ai-result',
+                  extra: {
+                    'imagePath': _currentImagePath,
+                    'result': result,
+                  },
+                );
+              }
+            });
+          }
+        }
+        if (next is AsyncError) {
+          final error = next.error;
+          if (context.mounted) {
+            _showErrorDialog(context, error);
           }
         }
       },
@@ -201,26 +313,26 @@ class _AiCameraPreviewScreenState extends ConsumerState<AiCameraPreviewScreen> {
                             Icon(Icons.error_outline_rounded, color: colorScheme.error),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Unable to analyze this photo.',
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      color: colorScheme.error,
-                                      fontWeight: FontWeight.bold,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Unable to analyze this photo.',
+                                      style: theme.textTheme.titleSmall?.copyWith(
+                                        color: colorScheme.error,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.xxs),
-                                  Text(
-                                    'Please make sure you have internet and retry, or try another photo.',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
+                                    const SizedBox(height: AppSpacing.xxs),
+                                    Text(
+                                      'Please make sure you have internet and retry, or try another photo.',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -273,7 +385,8 @@ class _AiCameraPreviewScreenState extends ConsumerState<AiCameraPreviewScreen> {
                 children: [
                   AppButton.primary(
                     label: isLoading ? 'Analyzing...' : 'Analyze Nutrition',
-                    icon: Icons.analytics_rounded,
+                    icon: isLoading ? null : Icons.analytics_rounded,
+                    isLoading: isLoading,
                     isFullWidth: true,
                     onPressed: isLoading ? null : _analyzeMeal,
                   ),

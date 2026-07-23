@@ -60,14 +60,18 @@ class _AiFoodResultScreenState extends ConsumerState<AiFoodResultScreen> {
         // Wait for camera animation to finish fully
         await Future.delayed(const Duration(milliseconds: 600));
         
-        if (mounted) {
+        if (context.mounted) {
           try {
             ref.read(foodRecognitionProvider.notifier).reset();
           } catch (e, s) {
             LoggerService.e('[ResultScreen] Exception in resetting provider', e, s);
           }
-          LoggerService.d('[ResultScreen] Replacing current result screen with new photo preview');
-          context.pushReplacement('/food-scanner/ai-preview', extra: image.path);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) {
+              LoggerService.d('[ResultScreen] Replacing current result screen with new photo preview');
+              context.pushReplacement('/food-scanner/ai-preview', extra: image.path);
+            }
+          });
         }
       } else {
         LoggerService.d('[ResultScreen] Capture cancelled by user');
