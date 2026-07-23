@@ -16,7 +16,6 @@ import 'package:fast_flow/shared/widgets/app_card.dart';
 import 'package:fast_flow/shared/widgets/app_button.dart';
 import 'package:fast_flow/shared/widgets/app_dialog.dart';
 import 'package:fast_flow/shared/widgets/animated_list_item.dart';
-import 'package:fast_flow/shared/widgets/shimmer_loading.dart';
 import 'package:fast_flow/shared/widgets/app_bottom_sheet.dart';
 import 'package:fast_flow/shared/widgets/app_input.dart';
 
@@ -52,43 +51,29 @@ class HistoryScreen extends ConsumerWidget {
   }
 
   Widget _buildListView(BuildContext context, WidgetRef ref) {
-    final recordsAsync = ref.watch(historyProvider);
-    final theme = Theme.of(context);
+    final records = ref.watch(historyProvider);
 
-    return recordsAsync.when(
-      loading: () => ListView.builder(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
-        itemCount: 5,
-        itemBuilder: (_, __) => const Padding(
-          padding: EdgeInsets.only(bottom: AppSpacing.md),
-          child: ShimmerLoading(width: double.infinity, height: 75),
-        ),
-      ),
-      error: (e, _) => Center(child: Text('Error: $e')),
-      data: (records) {
-        if (records.isEmpty) {
-          return const EmptyState(
-            key: ValueKey('empty_list'),
-            icon: Icons.history_rounded,
-            title: 'No fasting history yet',
-            subtitle: 'Completed cycles will appear here chronologically.',
-          );
-        }
+    if (records.isEmpty) {
+      return const EmptyState(
+        key: ValueKey('empty_list'),
+        icon: Icons.history_rounded,
+        title: 'No fasting history yet',
+        subtitle: 'Completed cycles will appear here chronologically.',
+      );
+    }
 
-        return ListView.builder(
-          key: const ValueKey('list_view'),
-          padding: const EdgeInsets.all(AppSpacing.screenPadding),
-          itemCount: records.length,
-          itemBuilder: (context, index) {
-            final record = records[index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: AnimatedListItem(
-                index: index,
-                child: _buildHistoryCard(context, ref, record),
-              ),
-            );
-          },
+    return ListView.builder(
+      key: const ValueKey('list_view'),
+      padding: const EdgeInsets.all(AppSpacing.screenPadding),
+      itemCount: records.length,
+      itemBuilder: (context, index) {
+        final record = records[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: AnimatedListItem(
+            index: index,
+            child: _buildHistoryCard(context, ref, record),
+          ),
         );
       },
     );
@@ -178,7 +163,7 @@ class HistoryScreen extends ConsumerWidget {
                 ),
               ),
               onDaySelected: (selected, focused) {
-                ref.read(selectedDayProvider.notifier).state = selected;
+                ref.read(selectedDayProvider.notifier).select(selected);
               },
             ),
           ),
@@ -227,10 +212,7 @@ class HistoryScreen extends ConsumerWidget {
   }
 
   List<FastingRecord> _getEventsForDay(WidgetRef ref, DateTime day) {
-    final records = ref.read(historyProvider).maybeWhen(
-          data: (data) => data,
-          orElse: () => <FastingRecord>[],
-        );
+    final records = ref.read(historyProvider);
     return records.where((r) => r.startTime.isSameDay(day)).toList();
   }
 
@@ -349,7 +331,7 @@ class HistoryScreen extends ConsumerWidget {
 
               // Status Dropdown
               DropdownButtonFormField<String>(
-                value: status,
+                initialValue: status,
                 decoration: const InputDecoration(
                   labelText: 'Fasting Status',
                   border: OutlineInputBorder(),
@@ -403,8 +385,10 @@ class HistoryScreen extends ConsumerWidget {
                   );
                   if (confirm == true && context.mounted) {
                     await ref.read(historyProviderNotifier.notifier).deleteRecord(existing.id);
-                    Navigator.of(context).pop();
-                    context.showSnack('Fasting record deleted');
+                    if (context.mounted) {
+                      Navigator.of(context).pop();
+                      context.showSnack('Fasting record deleted');
+                    }
                   }
                 },
               ),

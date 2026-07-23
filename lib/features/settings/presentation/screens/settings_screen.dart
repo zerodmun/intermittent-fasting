@@ -3,14 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:fast_flow/core/constants/app_spacing.dart';
-import 'package:fast_flow/core/constants/app_animations.dart';
 import 'package:fast_flow/core/extensions/context_extensions.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/core/services/notification_service.dart';
 import 'package:fast_flow/core/services/widget_sync_service.dart';
 import 'package:fast_flow/features/settings/presentation/providers/settings_providers.dart';
 import 'package:fast_flow/shared/widgets/app_card.dart';
-import 'package:fast_flow/shared/widgets/app_button.dart';
 import 'package:fast_flow/shared/widgets/app_dialog.dart';
 import 'package:fast_flow/shared/widgets/section_header.dart';
 
@@ -332,9 +330,11 @@ class SettingsScreen extends ConsumerWidget {
                       content: 'Are you sure? This will wipe your profile and logs permanently.',
                       isDestructive: true,
                     );
-                    if (confirm == true && context.mounted) {
+                    if (confirm == true) {
                       await HiveService.instance.resetAll();
-                      context.go('/onboarding');
+                      if (context.mounted) {
+                        context.go('/onboarding');
+                      }
                     }
                   },
                 ),

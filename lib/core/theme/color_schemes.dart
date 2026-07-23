@@ -20,11 +20,9 @@ const lightColorScheme = ColorScheme(
   onError: Color(0xFFFFFFFF),
   errorContainer: Color(0xFFFEE2E2),
   onErrorContainer: Color(0xFF991B1B),
-  background: Color(0xFFF8FAFC), // Slate 50
-  onBackground: Color(0xFF0F172A), // Slate 900
   surface: Color(0xFFFFFFFF),
   onSurface: Color(0xFF0F172A),
-  surfaceVariant: Color(0xFFF1F5F9), // Slate 100
+  surfaceContainerHighest: Color(0xFFF1F5F9), // Slate 100
   onSurfaceVariant: Color(0xFF475569), // Slate 600
   outline: Color(0xFFCBD5E1), // Slate 300
   outlineVariant: Color(0xFFE2E8F0), // Slate 200
@@ -49,11 +47,9 @@ const darkColorScheme = ColorScheme(
   onError: Color(0xFF0F172A),
   errorContainer: Color(0xFF991B1B),
   onErrorContainer: Color(0xFFFEE2E2),
-  background: Color(0xFF0B0F19), // Dark Rich Blue-Grey
-  onBackground: Color(0xFFF8FAFC),
   surface: Color(0xFF111827), // Slate 900
   onSurface: Color(0xFFF8FAFC),
-  surfaceVariant: Color(0xFF1F2937), // Slate 800
+  surfaceContainerHighest: Color(0xFF1F2937), // Slate 800
   onSurfaceVariant: Color(0xFF94A3B8), // Slate 400
   outline: Color(0xFF475569), // Slate 600
   outlineVariant: Color(0xFF334155), // Slate 700

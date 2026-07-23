@@ -121,7 +121,7 @@ class _NutritionDetailsScreenState extends ConsumerState<NutritionDetailsScreen>
                       ),
                       const SizedBox(height: AppSpacing.md),
                       DropdownButtonFormField<String>(
-                        value: _selectedActivity,
+                        initialValue: _selectedActivity,
                         decoration: const InputDecoration(
                           labelText: 'Activity Level',
                           border: OutlineInputBorder(),
@@ -141,7 +141,7 @@ class _NutritionDetailsScreenState extends ConsumerState<NutritionDetailsScreen>
                       ),
                       const SizedBox(height: AppSpacing.md),
                       DropdownButtonFormField<String>(
-                        value: _selectedGoal,
+                        initialValue: _selectedGoal,
                         decoration: const InputDecoration(
                           labelText: 'Weight Goal',
                           border: OutlineInputBorder(),

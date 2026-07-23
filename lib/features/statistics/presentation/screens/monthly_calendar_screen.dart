@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fast_flow/core/constants/app_spacing.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
-import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/shared/widgets/app_card.dart';
 
 class MonthlyCalendarScreen extends ConsumerWidget {
@@ -10,7 +9,6 @@ class MonthlyCalendarScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final recordsAsync = ref.watch(fastingRecordsProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -19,8 +17,9 @@ class MonthlyCalendarScreen extends ConsumerWidget {
         title: const Text('Monthly Fasting Calendar'),
         centerTitle: true,
       ),
-      body: recordsAsync.when(
-        data: (records) {
+      body: Builder(
+        builder: (context) {
+          final records = ref.watch(fastingRecordsProvider);
           final now = DateTime.now();
           final today = DateTime(now.year, now.month, now.day);
           final firstDay = DateTime(now.year, now.month, 1);
@@ -38,16 +37,11 @@ class MonthlyCalendarScreen extends ConsumerWidget {
             final dayDate = DateTime(now.year, now.month, d);
             if (dayDate.isAfter(today)) continue;
 
-            bool isCompleted = false;
-            for (final FastingRecord r in records) {
-              if (r.status == 'completed' &&
-                  r.startTime.year == dayDate.year &&
-                  r.startTime.month == dayDate.month &&
-                  r.startTime.day == dayDate.day) {
-                isCompleted = true;
-                break;
-              }
-            }
+            final isCompleted = records.any((r) =>
+                r.status == 'completed' &&
+                r.startTime.year == dayDate.year &&
+                r.startTime.month == dayDate.month &&
+                r.startTime.day == dayDate.day);
 
             if (isCompleted) {
               completedCount++;
@@ -70,7 +64,7 @@ class MonthlyCalendarScreen extends ConsumerWidget {
               children: [
                 // Month Header
                 Text(
-                  _getMonthName(now.month) + ' ${now.year}',
+                  '${_getMonthName(now.month)} ${now.year}',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.onSurface,
@@ -101,98 +95,82 @@ class MonthlyCalendarScreen extends ConsumerWidget {
                           );
                         }).toList(),
                       ),
-                      const Divider(height: AppSpacing.md),
+                      const SizedBox(height: AppSpacing.md),
 
-                      // Grid Rows
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: totalRows,
-                        itemBuilder: (context, rowIndex) {
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: List.generate(7, (colIndex) {
-                              final cellIndex = rowIndex * 7 + colIndex;
-                              final dayNum = cellIndex - weekdayOffset + 1;
+                      // Calendar Days Grid
+                      Column(
+                        children: List.generate(totalRows, (rowIndex) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: List.generate(7, (colIndex) {
+                                final cellIndex = rowIndex * 7 + colIndex;
+                                final dayNum = cellIndex - weekdayOffset + 1;
 
-                              if (cellIndex < weekdayOffset || dayNum > lastDay.day) {
-                                return const SizedBox(width: 32, height: 32);
-                              }
+                                if (cellIndex < weekdayOffset || dayNum > lastDay.day) {
+                                  return const SizedBox(width: 32, height: 32);
+                                }
 
-                              final dayDate = DateTime(now.year, now.month, dayNum);
-                              bool isFuture = dayDate.isAfter(today);
-                              bool isCompleted = false;
-
-                              for (final FastingRecord r in records) {
-                                if (r.status == 'completed' &&
+                                final dayDate = DateTime(now.year, now.month, dayNum);
+                                final isDayCompleted = records.any((r) =>
+                                    r.status == 'completed' &&
                                     r.startTime.year == dayDate.year &&
                                     r.startTime.month == dayDate.month &&
-                                    r.startTime.day == dayDate.day) {
-                                  isCompleted = true;
-                                  break;
-                                }
-                              }
+                                    r.startTime.day == dayDate.day);
 
-                              Color cellBg = Colors.transparent;
-                              Color textColor = colorScheme.onSurface;
-                              Widget icon = const SizedBox.shrink();
+                                final isToday = dayDate.year == today.year &&
+                                    dayDate.month == today.month &&
+                                    dayDate.day == today.day;
 
-                              if (isFuture) {
-                                textColor = colorScheme.onSurfaceVariant.withValues(alpha: 0.4);
-                              } else {
-                                if (isCompleted) {
-                                  cellBg = Colors.green.withValues(alpha: 0.15);
-                                  textColor = Colors.green;
-                                  icon = const Icon(Icons.check, size: 10, color: Colors.green);
-                                } else {
-                                  cellBg = Colors.red.withValues(alpha: 0.15);
+                                Color dayColor = Colors.transparent;
+                                Color textColor = colorScheme.onSurface;
+
+                                if (isDayCompleted) {
+                                  dayColor = Colors.green;
+                                  textColor = Colors.white;
+                                } else if (dayDate.isBefore(today)) {
+                                  dayColor = Colors.red.withValues(alpha: 0.15);
                                   textColor = Colors.red;
-                                  icon = const Icon(Icons.close, size: 10, color: Colors.red);
+                                } else if (isToday) {
+                                  dayColor = colorScheme.primaryContainer;
+                                  textColor = colorScheme.onPrimaryContainer;
                                 }
-                              }
 
-                              return Container(
-                                width: 32,
-                                height: 32,
-                                margin: const EdgeInsets.symmetric(vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: cellBg,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Stack(
+                                return Container(
+                                  width: 32,
+                                  height: 32,
                                   alignment: Alignment.center,
-                                  children: [
-                                    Positioned(
-                                      top: 4,
-                                      child: Text(
-                                        '$dayNum',
-                                        style: theme.textTheme.bodyMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: textColor,
-                                          fontSize: 12,
-                                        ),
-                                      ),
+                                  decoration: BoxDecoration(
+                                    color: dayColor,
+                                    shape: BoxShape.circle,
+                                    border: isToday
+                                        ? Border.all(color: colorScheme.primary, width: 2)
+                                        : null,
+                                  ),
+                                  child: Text(
+                                    '$dayNum',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontWeight: isToday || isDayCompleted
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: textColor,
                                     ),
-                                    if (!isFuture)
-                                      Positioned(
-                                        bottom: 2,
-                                        child: icon,
-                                      ),
-                                  ],
-                                ),
-                              );
-                            }),
+                                  ),
+                                );
+                              }),
+                            ),
                           );
-                        },
+                        }),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
 
-                // Current Month Summary
+                // Statistics Summary Section
                 Text(
-                  'Current Month Summary',
+                  'Monthly Progress Summary',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -202,16 +180,11 @@ class MonthlyCalendarScreen extends ConsumerWidget {
                 AppCard.elevated(
                   child: Column(
                     children: [
+                      _buildSummaryRow(context, 'Monthly Completion Rate', '$monthlyCompletionPercent%', colorScheme.primary),
+                      const Divider(height: AppSpacing.md),
                       _buildSummaryRow(context, 'Total Completed Days', '$completedCount days', Colors.green),
                       const Divider(height: AppSpacing.md),
                       _buildSummaryRow(context, 'Total Missed Days', '$missedCount days', Colors.red),
-                      const Divider(height: AppSpacing.md),
-                      _buildSummaryRow(
-                        context,
-                        'Monthly Completion Rate',
-                        '$monthlyCompletionPercent%',
-                        colorScheme.primary,
-                      ),
                     ],
                   ),
                 ),
@@ -219,8 +192,6 @@ class MonthlyCalendarScreen extends ConsumerWidget {
             ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error loading records: $err')),
       ),
     );
   }

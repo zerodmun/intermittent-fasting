@@ -6,11 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 
 import 'package:fast_flow/core/constants/app_spacing.dart';
-import 'package:fast_flow/core/constants/app_animations.dart';
 import 'package:fast_flow/core/extensions/context_extensions.dart';
 import 'package:fast_flow/shared/widgets/app_card.dart';
 import 'package:fast_flow/shared/widgets/app_button.dart';
-import 'package:fast_flow/shared/widgets/empty_state.dart';
 
 class ProgressPhotosScreen extends StatefulWidget {
   const ProgressPhotosScreen({super.key});
@@ -89,7 +87,7 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
         title: const Text('Progress Photos'),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(AppSpacing.screenPadding),
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -100,14 +98,14 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
                 color: colorScheme.onSurface,
               ),
             ),
-            SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               'Track changes in your physique over time.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
             ),
-            SizedBox(height: AppSpacing.xlg),
+            const SizedBox(height: AppSpacing.xlg),
 
             // Grid of 4 photo slots: Front, Back, Left, Right
             GridView.count(
@@ -124,7 +122,7 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
                 _buildPhotoSlot('right', 'Right Side'),
               ],
             ),
-            SizedBox(height: AppSpacing.xxl),
+            const SizedBox(height: AppSpacing.xxl),
 
             if (_photoPaths.isNotEmpty)
               AppButton.outlined(
@@ -156,7 +154,7 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
           Expanded(
             child: path != null
                 ? ClipRRect(
-                    borderRadius: BorderRadius.vertical(
+                    borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(AppSpacing.radiusLg),
                     ),
                     child: Image.file(
@@ -166,8 +164,8 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
                   )
                 : Container(
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceVariant,
-                      borderRadius: BorderRadius.vertical(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(AppSpacing.radiusLg),
                       ),
                     ),
@@ -179,7 +177,7 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
                   ),
           ),
           Padding(
-            padding: EdgeInsets.all(AppSpacing.sm),
+            padding: const EdgeInsets.all(AppSpacing.sm),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

@@ -34,7 +34,7 @@ class NextAlarmCard extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Text(
-                  "Active Plan",
+                  'Active Plan',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: context.colorScheme.onSurface,

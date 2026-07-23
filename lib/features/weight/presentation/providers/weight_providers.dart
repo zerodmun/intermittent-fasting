@@ -1,23 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
 import 'package:fast_flow/features/weight/domain/entities/body_comp_result.dart';
 import 'package:fast_flow/features/weight/data/services/body_comp_calculator.dart';
 import 'package:fast_flow/core/services/widget_sync_service.dart';
 
-final weightProvider = StateNotifierProvider<WeightNotifier, List<WeightEntry>>((ref) {
-  return WeightNotifier(ref);
-});
-
-class WeightNotifier extends StateNotifier<List<WeightEntry>> {
-  final Ref _ref;
-  WeightNotifier(this._ref) : super(HiveService.instance.allWeightEntries) {
-    _listen();
-  }
-
-  void _listen() {
-    // Auto-refresh when records change
+class WeightNotifier extends Notifier<List<WeightEntry>> {
+  @override
+  List<WeightEntry> build() {
+    return HiveService.instance.allWeightEntries;
   }
 
   Future<void> addEntry(WeightEntry entry) async {
@@ -38,6 +29,10 @@ class WeightNotifier extends StateNotifier<List<WeightEntry>> {
     WidgetSyncService.instance.syncToNative();
   }
 }
+
+final weightProvider = NotifierProvider<WeightNotifier, List<WeightEntry>>(
+  WeightNotifier.new,
+);
 
 final currentWeightProvider = Provider<WeightEntry?>((ref) {
   final entries = ref.watch(weightProvider);

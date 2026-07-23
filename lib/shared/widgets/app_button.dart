@@ -119,7 +119,7 @@ class AppButton extends StatelessWidget {
         border = BorderSide.none;
         break;
       case AppButtonVariant.secondary:
-        bgColor = onPressed == null ? colorScheme.onSurface.withValues(alpha: 0.04) : colorScheme.surfaceVariant;
+        bgColor = onPressed == null ? colorScheme.onSurface.withValues(alpha: 0.04) : colorScheme.surfaceContainerHighest;
         fgColor = onPressed == null ? colorScheme.onSurface.withValues(alpha: 0.38) : colorScheme.onSurfaceVariant;
         border = BorderSide.none;
         break;

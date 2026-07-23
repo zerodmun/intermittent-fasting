@@ -83,7 +83,7 @@ class FastingStateNotifier extends Notifier<FastingState?> {
     String? note,
     String? reason,
   }) {
-    final existing = HiveService.instance.fastingRecordsBox.get(id) as FastingRecord?;
+    final existing = HiveService.instance.fastingRecordsBox.get(id);
     if (existing != null) {
       existing.startTime = startTime;
       existing.endTime = endTime;

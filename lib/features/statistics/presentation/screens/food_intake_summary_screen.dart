@@ -343,7 +343,7 @@ class _FoodIntakeSummaryScreenState extends ConsumerState<FoodIntakeSummaryScree
                           child: LinearProgressIndicator(
                             value: progress,
                             minHeight: 8,
-                            backgroundColor: colorScheme.surfaceVariant.withOpacity(0.5),
+                            backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                           ),
                         ),
                         const SizedBox(height: AppSpacing.md),
@@ -769,7 +769,7 @@ class _SearchFoodSheetState extends ConsumerState<_SearchFoodSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

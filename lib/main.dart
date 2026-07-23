@@ -5,14 +5,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'package:fast_flow/app.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
 import 'package:fast_flow/core/services/notification_service.dart';
 import 'package:fast_flow/core/services/widget_sync_service.dart';
 
+import 'package:fast_flow/core/services/logger_service.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables safely
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    LoggerService.e('main: Failed to load .env file', e);
+  }
 
   // Enforce completely offline typography loading
   GoogleFonts.config.allowRuntimeFetching = false;
@@ -30,11 +41,11 @@ Future<void> main() async {
       NotificationService.instance.init(),
       WidgetSyncService.instance.initialize(),
     ]).timeout(const Duration(seconds: 4), onTimeout: () {
-      print('main: Service initialization timed out after 4 seconds. Proceeding to startup...');
+      LoggerService.w('main: Service initialization timed out after 4 seconds. Proceeding to startup...');
       return [];
     });
   } catch (e, stackTrace) {
-    print('main: Service initialization failed: $e\n$stackTrace');
+    LoggerService.e('main: Service initialization failed', e, stackTrace);
   }
 
   // Obtain SharedPreferences with a fail-safe fallback
@@ -42,7 +53,7 @@ Future<void> main() async {
   try {
     prefs = await SharedPreferences.getInstance();
   } catch (e) {
-    print('main: Failed to initialize SharedPreferences: $e. Falling back to mock implementation...');
+    LoggerService.e('main: Failed to initialize SharedPreferences', e);
     // ignore: invalid_use_of_visible_for_testing_member
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();

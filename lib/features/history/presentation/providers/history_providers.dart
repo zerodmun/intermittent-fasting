@@ -4,8 +4,8 @@ import 'package:fast_flow/core/providers/app_providers.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/statistics/presentation/providers/statistics_provider.dart';
 
-final historyProvider = FutureProvider<List<FastingRecord>>((ref) async {
-  return ref.watch(fastingRecordsProvider.future);
+final historyProvider = Provider<List<FastingRecord>>((ref) {
+  return ref.watch(fastingRecordsProvider);
 });
 
 final historyProviderNotifier = NotifierProvider<HistoryNotifier, List<FastingRecord>>(HistoryNotifier.new);
@@ -13,7 +13,7 @@ final historyProviderNotifier = NotifierProvider<HistoryNotifier, List<FastingRe
 class HistoryNotifier extends Notifier<List<FastingRecord>> {
   @override
   List<FastingRecord> build() {
-    return HiveService.instance.allFastingRecords;
+    return ref.watch(fastingRecordsProvider);
   }
 
   void refresh() {

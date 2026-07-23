@@ -297,7 +297,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
                     // Semi-transparent overlay around the scan area
                     ColorFiltered(
                       colorFilter: ColorFilter.mode(
-                        Colors.black.withOpacity(0.5),
+                        Colors.black.withValues(alpha: 0.5),
                         BlendMode.srcOut,
                       ),
                       child: Stack(

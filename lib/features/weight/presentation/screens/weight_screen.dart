@@ -5,9 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:fast_flow/core/constants/app_spacing.dart';
-import 'package:fast_flow/core/constants/app_animations.dart';
 import 'package:fast_flow/core/extensions/context_extensions.dart';
-import 'package:fast_flow/features/onboarding/presentation/providers/onboarding_provider.dart';
 import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
@@ -18,7 +16,6 @@ import 'package:fast_flow/shared/widgets/app_input.dart';
 import 'package:fast_flow/shared/widgets/app_dialog.dart';
 import 'package:fast_flow/shared/widgets/app_bottom_sheet.dart';
 import 'package:fast_flow/shared/widgets/empty_state.dart';
-import 'package:fast_flow/shared/widgets/section_header.dart';
 import 'package:fast_flow/shared/widgets/shimmer_loading.dart';
 import 'package:fast_flow/shared/widgets/metric_change_badge.dart';
 import 'package:fast_flow/features/body_composition/data/services/body_comp_service.dart';
@@ -116,7 +113,7 @@ class WeightScreen extends ConsumerWidget {
                               ? _calculateProgress(latest.weightKg, profile.weightKg, profile.goalWeightKg)
                               : 0.0,
                           minHeight: 8,
-                          backgroundColor: colorScheme.surfaceVariant,
+                          backgroundColor: colorScheme.surfaceContainerHighest,
                           valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
                         ),
                       ),
@@ -365,10 +362,10 @@ class _LoadingWeightScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.screenPadding),
+    return const SingleChildScrollView(
+      padding: EdgeInsets.all(AppSpacing.screenPadding),
       child: Column(
-        children: const [
+        children: [
           ShimmerLoading(width: double.infinity, height: 130),
           SizedBox(height: AppSpacing.md),
           ShimmerLoading(width: double.infinity, height: 80),

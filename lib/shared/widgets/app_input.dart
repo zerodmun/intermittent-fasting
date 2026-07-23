@@ -119,7 +119,7 @@ class AppNumberStepperInput extends StatelessWidget {
             vertical: AppSpacing.xs,
           ),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceVariant,
+            color: colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
             border: Border.all(color: colorScheme.outlineVariant),
           ),

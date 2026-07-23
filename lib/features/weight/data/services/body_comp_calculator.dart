@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:fast_flow/features/weight/domain/entities/body_comp_result.dart';
 import 'package:fast_flow/features/weight/domain/entities/body_fat_category.dart';
-import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
 import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
 
 /// U.S. Navy Body Fat Formula Calculator

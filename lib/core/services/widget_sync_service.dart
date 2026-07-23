@@ -2,10 +2,9 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/features/fasting/data/services/fasting_engine.dart';
-import 'package:fast_flow/features/fasting/domain/entities/fasting_state.dart';
-import 'package:fast_flow/features/weight/domain/entities/body_comp_result.dart';
 import 'package:fast_flow/features/weight/data/services/body_comp_calculator.dart';
 import 'package:fast_flow/core/helpers/streak_calculator.dart';
+import 'package:fast_flow/core/services/logger_service.dart';
 
 class WidgetSettings {
   final bool widgetEnabled;
@@ -46,8 +45,6 @@ class WidgetSettings {
 class WidgetSyncService {
   static const _channel = MethodChannel('com.fastflow.app/widget_sync');
 
-  WidgetSyncService._();
-
   static final WidgetSyncService instance = WidgetSyncService._internal();
   factory WidgetSyncService() => instance;
   WidgetSyncService._internal();
@@ -68,7 +65,7 @@ class WidgetSyncService {
       );
       await syncToNative();
     } catch (e, stackTrace) {
-      print('WidgetSyncService: Initialization failed: $e\n$stackTrace');
+      LoggerService.e('WidgetSyncService: Initialization failed', e, stackTrace);
     }
   }
 
@@ -105,7 +102,7 @@ class WidgetSyncService {
             hipCm: latest.hipCm,
             gender: profile.gender,
           );
-          bodyFat = comp?.bodyFatPercentage;
+          bodyFat = comp.bodyFatPercentage;
         }
       }
 

@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:uuid/uuid.dart';
-
-import 'package:fast_flow/core/theme/color_schemes.dart';
 import 'package:fast_flow/core/constants/app_spacing.dart';
 import 'package:fast_flow/core/constants/app_animations.dart';
 import 'package:fast_flow/core/extensions/context_extensions.dart';
@@ -54,7 +51,7 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
             child: Container(
               padding: const EdgeInsets.all(AppSpacing.xs),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.5),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
               ),
               child: Row(
@@ -216,7 +213,7 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  "Active Plan",
+                  'Active Plan',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -615,7 +612,6 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
 
   // ── LOG MUTATIONS ──
   void _editDaySchedule(BuildContext context, int weekdayNum, DailySchedule current, FastingStateNotifier notifier) async {
-    final theme = Theme.of(context);
     final fastTime = TimeOfDay(hour: current.fastHour, minute: current.fastMin);
     final eatTime = TimeOfDay(hour: current.eatHour, minute: current.eatMin);
 
@@ -636,7 +632,8 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
 
       if (selectedEat == null) return;
 
-      final updatedSched = notifier.state?.schedule.copyWith() ?? FastingSchedule.defaultSchedule();
+      final state = ref.read(fastingStateNotifierProvider);
+      final updatedSched = state?.schedule.copyWith() ?? FastingSchedule.defaultSchedule();
       updatedSched.dailySchedules[weekdayNum] = DailySchedule(
         fastHour: selectedFast.hour,
         fastMin: selectedFast.minute,
@@ -646,7 +643,9 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
 
       await HiveService.instance.saveFastingSchedule(updatedSched);
       notifier.onScheduleChanged();
-      context.showSnack('Plan updated successfully', isSuccess: true);
+      if (context.mounted) {
+        context.showSnack('Plan updated successfully', isSuccess: true);
+      }
     }
   }
 
@@ -810,7 +809,7 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
 
               // Status Dropdown
               DropdownButtonFormField<String>(
-                value: status,
+                initialValue: status,
                 decoration: const InputDecoration(
                   labelText: 'Fasting Status',
                   border: OutlineInputBorder(),
@@ -864,8 +863,10 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
                   if (confirm == true && context.mounted) {
                     await HiveService.instance.deleteFastingRecord(existing.id);
                     notifier.refresh();
-                    Navigator.of(context).pop();
-                    context.showSnack('Fasting record deleted');
+                    if (context.mounted) {
+                      Navigator.of(context).pop();
+                      context.showSnack('Fasting record deleted');
+                    }
                   }
                 },
               ),

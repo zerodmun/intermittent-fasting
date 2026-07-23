@@ -12,7 +12,6 @@ import 'package:fast_flow/features/statistics/presentation/screens/weekly_detail
 import 'package:fast_flow/features/statistics/presentation/screens/monthly_calendar_screen.dart';
 import 'package:fast_flow/features/statistics/presentation/screens/average_fast_detail_screen.dart';
 import 'package:fast_flow/features/statistics/presentation/providers/statistics_provider.dart';
-import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/shared/widgets/app_card.dart';
 import 'package:fast_flow/shared/widgets/stat_card.dart';
 import 'package:fast_flow/shared/widgets/section_header.dart';
@@ -25,13 +24,8 @@ class StatisticsScreen extends ConsumerWidget {
     final stats = ref.watch(statisticsProvider);
     final profileAsync = ref.watch(userProfileProvider);
     final foodLogs = ref.watch(foodLogsProvider);
-    final recordsAsync = ref.watch(fastingRecordsProvider);
+    final records = ref.watch(fastingRecordsProvider);
     final theme = Theme.of(context);
-
-    final records = recordsAsync.maybeWhen(
-      data: (r) => r,
-      orElse: () => <FastingRecord>[],
-    );
 
     // Calculate Daily Calorie Requirement
     final profile = profileAsync.maybeWhen(

@@ -57,8 +57,8 @@ class SessionResolver {
           ? expectedEnd
           : (override?.endTime ?? expectedEnd);
 
-      final isFastingActive = now.isBefore(actualEnd) &&
-          (override == null || override.status == 'active');
+      final isFastingActive = (override != null && override.status == 'active') ||
+          (override == null && now.isBefore(actualEnd));
 
       if (isFastingActive) {
         Duration elapsed = now.difference(actualStart);
@@ -84,44 +84,20 @@ class SessionResolver {
           nextPhase: FastingPhase.eating,
         );
       } else if (override != null && override.status != 'active') {
-        FastingStatus status = FastingStatus.fasting;
-        FastingPhase phase = FastingPhase.fasting;
-        
-        if (override.status == 'completed') {
-          if (now.isAfter(actualEnd)) {
-            status = FastingStatus.completed;
-            phase = FastingPhase.eating;
-          } else {
-            status = FastingStatus.fasting;
-            phase = FastingPhase.fasting;
-          }
-        } else if (override.status == 'skipped') {
-          status = FastingStatus.skipped;
-          phase = FastingPhase.eating;
-        } else if (override.status == 'cancelled') {
-          status = FastingStatus.cancelled;
-          phase = FastingPhase.eating;
-        }
-
-        if (phase == FastingPhase.fasting) {
-          Duration elapsed = now.difference(actualStart);
-          Duration remaining = actualEnd.difference(now);
-          if (elapsed.isNegative) elapsed = Duration.zero;
-          if (remaining.isNegative) remaining = Duration.zero;
-          final total = actualEnd.difference(actualStart);
-          final progress = total.inSeconds > 0
-              ? (elapsed.inSeconds / total.inSeconds).clamp(0.0, 1.0)
-              : 0.0;
+        if (now.isBefore(actualEnd)) {
+          FastingStatus status = FastingStatus.completed;
+          if (override.status == 'skipped') status = FastingStatus.skipped;
+          if (override.status == 'cancelled') status = FastingStatus.cancelled;
 
           return FastingState(
             status: status,
-            elapsed: elapsed,
-            remaining: remaining,
-            progress: progress,
+            elapsed: now.difference(actualStart),
+            remaining: Duration.zero,
+            progress: 1.0,
             schedule: schedule,
             activeWindowStart: actualStart,
             activeWindowEnd: actualEnd,
-            currentPhase: FastingPhase.fasting,
+            currentPhase: FastingPhase.eating,
             nextTransition: actualEnd,
             nextPhase: FastingPhase.eating,
           );

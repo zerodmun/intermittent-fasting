@@ -5,6 +5,23 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
+import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
+import 'package:fast_flow/features/fasting/data/services/fasting_engine.dart';
+import 'package:fast_flow/features/fasting/data/services/timeline_generator.dart';
+
+class ScheduledNotification {
+  final int id;
+  final String title;
+  final String body;
+  final DateTime scheduledDate;
+
+  ScheduledNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.scheduledDate,
+  });
+}
 
 class NotificationService {
   NotificationService._();
@@ -17,6 +34,9 @@ class NotificationService {
     if (_initialized) return;
     try {
       _configureLocalTimeZone();
+
+      // Ensure FastingEngine is initialized to handle state queries correctly
+      FastingEngine().initialize();
 
       // Attempt initialization with primary launcher_icon resource
       const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
@@ -72,6 +92,11 @@ class NotificationService {
             event.key == 'fasting_notification_enabled') {
           scheduleFastingNotifications();
         }
+      });
+
+      // Automatically reschedule on fasting record changes (e.g. start, edit, complete, delete, resume)
+      HiveService.instance.fastingRecordsBox.watch().listen((_) {
+        scheduleFastingNotifications();
       });
 
       _initialized = true;
@@ -159,12 +184,83 @@ class NotificationService {
     }
   }
 
+  /// Recalculates and returns the exact list of notifications to schedule based on active/upcoming fasting state.
+  List<ScheduledNotification> calculateNotificationsToSchedule({
+    required FastingSchedule schedule,
+    required DateTime now,
+    required FastingRecord? Function(DateTime expectedStart) getRecordForSession,
+    bool eatingEnabled = true,
+    bool fastingEnabled = true,
+  }) {
+    if (!eatingEnabled && !fastingEnabled) return [];
+
+    final List<ScheduledNotification> result = [];
+    final sessions = TimelineGenerator.generateTimeline(
+      schedule: schedule,
+      centerDate: now,
+      daysBefore: 2,
+      daysAfter: 7,
+    );
+
+    int notificationIdCounter = 1000;
+
+    for (final session in sessions) {
+      final expectedStart = session.expectedStart;
+      final expectedEnd = session.expectedEnd;
+
+      final override = getRecordForSession(expectedStart);
+      final actualStart = override?.startTime ?? expectedStart;
+      final actualEnd = (override != null && override.status == 'active')
+          ? expectedEnd
+          : (override?.endTime ?? expectedEnd);
+
+      // Check if fasting session is currently active
+      final isFastingActive = (override != null && override.status == 'active') ||
+          (override == null && now.isBefore(actualEnd) && (now.isAfter(actualStart) || now.isAtSameMomentAs(actualStart)));
+
+      if (isFastingActive) {
+        // Current active session:
+        // Schedule only the Eating notification (if eating is enabled and actualEnd is in the future)
+        if (eatingEnabled && actualEnd.isAfter(now)) {
+          result.add(ScheduledNotification(
+            id: notificationIdCounter++,
+            title: 'Time to Eat',
+            body: 'Congratulations! Your fasting session is complete.',
+            scheduledDate: actualEnd,
+          ));
+        }
+      } else if (override == null) {
+        // Future scheduled session (starts in the future):
+        if (actualStart.isAfter(now)) {
+          // Schedule Start Fasting notification
+          if (fastingEnabled) {
+            result.add(ScheduledNotification(
+              id: notificationIdCounter++,
+              title: 'Time to Fast',
+              body: 'Your fasting window starts now.',
+              scheduledDate: actualStart,
+            ));
+          }
+
+          // Schedule Eating Time notification
+          if (eatingEnabled && actualEnd.isAfter(now)) {
+            result.add(ScheduledNotification(
+              id: notificationIdCounter++,
+              title: 'Time to Eat',
+              body: 'Congratulations! Your fasting session is complete.',
+              scheduledDate: actualEnd,
+            ));
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
   Future<void> scheduleFastingNotifications() async {
     try {
-      await _notifications.cancelAll();
-      if (kDebugMode) {
-        debugPrint('[NotificationService] Notification cancelled');
-      }
+      await cancelAll();
 
       final enabled = HiveService.instance.getSetting<bool>('notifications_enabled') ?? true;
       if (!enabled) {
@@ -174,46 +270,31 @@ class NotificationService {
         return;
       }
 
-      final FastingSchedule? schedule = HiveService.instance.fastingScheduleBox.get('schedule');
-      if (schedule == null) {
-        if (kDebugMode) {
-          debugPrint('[NotificationService] Reschedule completed: no schedule found');
-        }
-        return;
-      }
-
       final eatingEnabled = HiveService.instance.getSetting<bool>('eating_notification_enabled') ?? true;
       final fastingEnabled = HiveService.instance.getSetting<bool>('fasting_notification_enabled') ?? true;
 
-      for (int day = 1; day <= 7; day++) {
-        final daySched = schedule.getScheduleFor(day);
+      final schedule = HiveService.instance.fastingSchedule;
+      final now = DateTime.now();
 
-        // Fasting start notification (odd IDs)
-        if (fastingEnabled) {
-          await _scheduleDailyNotification(
-            id: day * 2 - 1,
-            title: '🌙 Time to Fast',
-            body: 'Your fasting session has started.\nStay hydrated and keep going.',
-            hour: daySched.fastHour,
-            minute: daySched.fastMin,
-            weekday: day,
-          );
-        }
+      final list = calculateNotificationsToSchedule(
+        schedule: schedule,
+        now: now,
+        getRecordForSession: FastingEngine().getRecordForSession,
+        eatingEnabled: eatingEnabled,
+        fastingEnabled: fastingEnabled,
+      );
 
-        // Eating window start notification (even IDs)
-        if (eatingEnabled) {
-          await _scheduleDailyNotification(
-            id: day * 2,
-            title: '🍽 Time to Eat',
-            body: 'Your eating window has started.\nEnjoy your meal and stay within your calorie goal.',
-            hour: daySched.eatHour,
-            minute: daySched.eatMin,
-            weekday: day,
-          );
-        }
+      for (final n in list) {
+        await _scheduleOneShotNotification(
+          id: n.id,
+          title: n.title,
+          body: n.body,
+          scheduledDate: n.scheduledDate,
+        );
       }
+
       if (kDebugMode) {
-        debugPrint('[NotificationService] Reschedule completed');
+        debugPrint('[NotificationService] Rescheduled ${list.length} notifications');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -222,21 +303,23 @@ class NotificationService {
     }
   }
 
-  Future<void> _scheduleDailyNotification({
+  Future<void> _scheduleOneShotNotification({
     required int id,
     required String title,
     required String body,
-    required int hour,
-    required int minute,
-    required int weekday,
+    required DateTime scheduledDate,
   }) async {
     try {
-      final scheduledDate = _nextInstanceOfWeekday(weekday, hour, minute);
+      final tzDate = tz.TZDateTime.from(scheduledDate, tz.local);
+      if (tzDate.isBefore(tz.TZDateTime.now(tz.local))) {
+        return; // Don't schedule in the past
+      }
+
       await _notifications.zonedSchedule(
         id,
         title,
         body,
-        scheduledDate,
+        tzDate,
         const NotificationDetails(
           android: AndroidNotificationDetails(
             'fasting_schedule',
@@ -255,14 +338,13 @@ class NotificationService {
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       );
       if (kDebugMode) {
-        debugPrint('[NotificationService] Notification scheduled: ID $id at $scheduledDate');
+        debugPrint('[NotificationService] Notification scheduled: ID $id at $tzDate');
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[NotificationService] Failed scheduling daily notification ID $id: $e');
+        debugPrint('[NotificationService] Failed scheduling notification ID $id: $e');
       }
     }
   }

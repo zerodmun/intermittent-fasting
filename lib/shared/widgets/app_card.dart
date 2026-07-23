@@ -56,51 +56,31 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
-    BoxDecoration decoration;
-    double elevation = 0.0;
+    final BoxDecoration decoration;
+    final shadow = AppCardStyle.getShadows(isDark);
 
     switch (variant) {
       case AppCardVariant.standard:
-        decoration = BoxDecoration(
-          color: colorScheme.surfaceVariant.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-        );
-        break;
       case AppCardVariant.elevated:
-        decoration = BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-          boxShadow: AppSpacing.shadowSm(theme.brightness == Brightness.dark ? Colors.black : colorScheme.outline),
-        );
-        elevation = 2.0;
-        break;
       case AppCardVariant.outlined:
         decoration = BoxDecoration(
           color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-          border: Border.all(color: colorScheme.outline),
+          borderRadius: BorderRadius.circular(24.0),
+          boxShadow: shadow,
         );
         break;
       case AppCardVariant.gradient:
         decoration = BoxDecoration(
           gradient: gradient,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-          boxShadow: gradient != null
-              ? [
-                  BoxShadow(
-                    color: gradient!.colors.first.withValues(alpha: 0.25),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : null,
+          borderRadius: BorderRadius.circular(24.0),
+          boxShadow: shadow,
         );
         break;
     }
 
-    Widget content = Container(
+    final Widget content = Container(
       width: width,
       height: height,
       padding: padding ?? const EdgeInsets.all(AppSpacing.md),
@@ -113,7 +93,7 @@ class AppCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+          borderRadius: BorderRadius.circular(24.0),
           child: content,
         ),
       );
@@ -122,3 +102,36 @@ class AppCard extends StatelessWidget {
     return content;
   }
 }
+
+/// Helper class that defines the premium adaptive shadow/elevation system.
+class AppCardStyle {
+  AppCardStyle._();
+
+  /// Returns the soft premium shadow hierarchy for cards, adapted to Light/Dark themes.
+  static List<BoxShadow> getShadows(bool isDark) {
+    if (isDark) {
+      return [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.45),
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+        ),
+        BoxShadow(
+          color: Colors.white.withValues(alpha: 0.04),
+          blurRadius: 2,
+          spreadRadius: -1,
+        ),
+      ];
+    } else {
+      return [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.08),
+          blurRadius: 16,
+          spreadRadius: 0,
+          offset: const Offset(0, 6),
+        ),
+      ];
+    }
+  }
+}
+

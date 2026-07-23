@@ -19,7 +19,6 @@ class AverageFastDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final recordsAsync = ref.watch(fastingRecordsProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -28,8 +27,9 @@ class AverageFastDetailScreen extends ConsumerWidget {
         title: const Text('Average Fast Details'),
         centerTitle: true,
       ),
-      body: recordsAsync.when(
-        data: (records) {
+      body: Builder(
+        builder: (context) {
+          final records = ref.watch(fastingRecordsProvider);
           final completed = records.where((r) => r.status == 'completed').toList();
           final totalCompleted = completed.length;
 
@@ -126,8 +126,6 @@ class AverageFastDetailScreen extends ConsumerWidget {
             ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error loading history: $err')),
       ),
     );
   }

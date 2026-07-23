@@ -35,30 +35,7 @@ class FoodApiService {
     'garam': 'salt',
   };
 
-  static const Map<String, String> _enToId = {
-    'rice': 'nasi',
-    'white rice': 'nasi putih',
-    'fried rice': 'nasi goreng',
-    'chicken': 'ayam',
-    'beef': 'sapi',
-    'egg': 'telur',
-    'fish': 'ikan',
-    'milk': 'susu',
-    'bread': 'roti',
-    'noodle': 'mie',
-    'instant noodle': 'mie instan',
-    'banana': 'pisang',
-    'apple': 'apel',
-    'orange': 'jeruk',
-    'watermelon': 'semangka',
-    'potato': 'kentang',
-    'tofu': 'tahu',
-    'tempeh': 'tempe',
-    'coffee': 'kopi',
-    'tea': 'teh',
-    'sugar': 'gula',
-    'salt': 'garam',
-  };
+
 
   static String _normalize(String input) {
     var str = input.toLowerCase().trim();

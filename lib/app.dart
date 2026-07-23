@@ -10,6 +10,8 @@ import 'package:fast_flow/features/settings/presentation/providers/settings_prov
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:fast_flow/core/services/logger_service.dart';
+
 class FastFlowApp extends ConsumerStatefulWidget {
   final SharedPreferences prefs;
 
@@ -51,9 +53,14 @@ class _FastFlowAppState extends ConsumerState<FastFlowApp> {
   }
 
   void _handleNavigation(String route) {
+    LoggerService.d('[AppDeepLink] Received route: "$route"');
+    if (route == '/' || route.isEmpty) {
+      LoggerService.d('[AppDeepLink] Ignoring default root route to preserve current/restored route state');
+      return;
+    }
     String target = route;
-    if (route == '/') target = '/home';
     if (route == '/body_composition') target = '/home/body-composition';
+    LoggerService.d('[AppDeepLink] Redirecting GoRouter to: $target');
     _router.go(target);
   }
 

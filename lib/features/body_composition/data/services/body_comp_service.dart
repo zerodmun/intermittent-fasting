@@ -38,11 +38,11 @@ class BodyCompService {
     if (hasBodyFat) {
       if (isMale) {
         bodyFatPercentage = 495 /
-            (1.0324 - 0.19077 * _log10(waistCm! - neckCm!) + 0.15456 * _log10(profile.heightCm)) -
+            (1.0324 - 0.19077 * _log10(waistCm - neckCm) + 0.15456 * _log10(profile.heightCm)) -
             450;
       } else {
         bodyFatPercentage = 495 /
-            (1.29579 - 0.35004 * _log10(waistCm! + hipCm! - neckCm!) + 0.22100 * _log10(profile.heightCm)) -
+            (1.29579 - 0.35004 * _log10(waistCm + hipCm! - neckCm) + 0.22100 * _log10(profile.heightCm)) -
             450;
       }
       bodyFatPercentage = bodyFatPercentage.clamp(3.0, 60.0);

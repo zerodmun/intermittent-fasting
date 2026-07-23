@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fast_flow/core/helpers/streak_calculator.dart';
-import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
 
 class StatsData {
@@ -28,11 +27,8 @@ class StatsData {
 }
 
 final statisticsProvider = Provider<StatsData>((ref) {
-  final recordsAsync = ref.watch(fastingRecordsProvider);
-  final records = recordsAsync.maybeWhen(
-    data: (data) => data,
-    orElse: () => HiveService.instance.allFastingRecords,
-  );
+  final records = ref.watch(fastingRecordsProvider);
+  final today = ref.watch(currentDateProvider);
   final streak = StreakCalculator.calculate(records);
 
   final completed = records.where((r) => r.status == 'completed').toList();
@@ -53,8 +49,7 @@ final statisticsProvider = Provider<StatsData>((ref) {
   final totalFastingHours = totalMinutes / 60.0;
 
   // Compute last 7 days chart data (Monday to Sunday of current week)
-  final now = DateTime.now();
-  final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+  final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
   final weeklyData = List<double>.generate(7, (index) {
     final day = startOfWeek.add(Duration(days: index));
     double hours = 0;
@@ -68,7 +63,7 @@ final statisticsProvider = Provider<StatsData>((ref) {
 
   // Compute last 30 days chart data
   final monthlyData = List<double>.generate(30, (index) {
-    final day = DateTime(now.year, now.month, now.day).subtract(Duration(days: 29 - index));
+    final day = today.subtract(Duration(days: 29 - index));
     double hours = 0;
     for (final r in completed) {
       if (r.startTime.year == day.year && r.startTime.month == day.month && r.startTime.day == day.day) {

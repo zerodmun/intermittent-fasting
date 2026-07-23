@@ -8,11 +8,9 @@ import 'package:fast_flow/core/constants/app_spacing.dart';
 import 'package:fast_flow/core/extensions/context_extensions.dart';
 import 'package:fast_flow/core/extensions/duration_extensions.dart';
 import 'package:fast_flow/features/fasting/presentation/providers/fasting_providers.dart';
-import 'package:fast_flow/features/fasting/domain/entities/fasting_state.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
-import 'package:fast_flow/core/helpers/streak_calculator.dart';
 
 import 'package:fast_flow/features/home/presentation/widgets/home_header.dart';
 import 'package:fast_flow/features/home/presentation/widgets/fasting_progress_card.dart';
@@ -35,7 +33,7 @@ class HomeScreen extends ConsumerWidget {
     final profileAsync = ref.watch(userProfileProvider);
     final timerState = ref.watch(fastingStateNotifierProvider);
     final streak = ref.watch(streakProvider);
-    final recordsAsync = ref.watch(fastingRecordsProvider);
+    final records = ref.watch(fastingRecordsProvider);
     final weightAsync = ref.watch(weightEntriesProvider);
 
     return Scaffold(
@@ -99,7 +97,7 @@ class HomeScreen extends ConsumerWidget {
                     const SizedBox(height: AppSpacing.md),
                     _buildBodyCompSummary(context, profile, weightAsync),
                     const SizedBox(height: AppSpacing.md),
-                    _buildRecentFasts(context, recordsAsync),
+                    _buildRecentFasts(context, records),
                   ],
                 ),
               ),
@@ -232,7 +230,7 @@ class HomeScreen extends ConsumerWidget {
                           profile.goalWeightKg,
                         ),
                         minHeight: 8,
-                        backgroundColor: context.colorScheme.surfaceVariant,
+                        backgroundColor: context.colorScheme.surfaceContainerHighest,
                         valueColor: AlwaysStoppedAnimation<Color>(context.colorScheme.primary),
                       ),
                     ),
@@ -279,7 +277,7 @@ class HomeScreen extends ConsumerWidget {
 
   Widget _buildRecentFasts(
     BuildContext context,
-    AsyncValue<List<FastingRecord>> recordsAsync,
+    List<FastingRecord> records,
   ) {
     final theme = Theme.of(context);
 
@@ -293,18 +291,8 @@ class HomeScreen extends ConsumerWidget {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
-          child: recordsAsync.when(
-            loading: () => Column(
-              children: List.generate(
-                3,
-                (_) => const Padding(
-                  padding: EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: ShimmerLoading(width: double.infinity, height: 72),
-                ),
-              ),
-            ),
-            error: (e, _) => Center(child: Text('Error: $e')),
-            data: (records) {
+          child: Builder(
+            builder: (context) {
               if (records.isEmpty) {
                 return const EmptyState(
                   icon: Icons.history_toggle_off_rounded,
@@ -399,8 +387,8 @@ class _LoadingDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.screenPadding),
+    return const SingleChildScrollView(
+      padding: EdgeInsets.all(AppSpacing.screenPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -409,22 +397,22 @@ class _LoadingDashboard extends StatelessWidget {
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   ShimmerLoading(width: 140, height: 20),
                   SizedBox(height: 6),
                   ShimmerLoading(width: 200, height: 32),
                 ],
               ),
-              const ShimmerLoading(width: 52, height: 52, borderRadius: 26),
+              ShimmerLoading(width: 52, height: 52, borderRadius: 26),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          const ShimmerLoading(width: double.infinity, height: 160, borderRadius: AppSpacing.radiusLg),
-          const SizedBox(height: AppSpacing.md),
-          const ShimmerLoading(width: double.infinity, height: 48, borderRadius: AppSpacing.radiusMd),
-          const SizedBox(height: AppSpacing.md),
+          SizedBox(height: AppSpacing.lg),
+          ShimmerLoading(width: double.infinity, height: 160, borderRadius: AppSpacing.radiusLg),
+          SizedBox(height: AppSpacing.md),
+          ShimmerLoading(width: double.infinity, height: 48, borderRadius: AppSpacing.radiusMd),
+          SizedBox(height: AppSpacing.md),
           Row(
-            children: const [
+            children: [
               Expanded(child: ShimmerLoading(width: double.infinity, height: 100)),
               SizedBox(width: AppSpacing.md),
               Expanded(child: ShimmerLoading(width: double.infinity, height: 100)),
@@ -432,10 +420,10 @@ class _LoadingDashboard extends StatelessWidget {
               Expanded(child: ShimmerLoading(width: double.infinity, height: 100)),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          const ShimmerLoading(width: 120, height: 24),
-          const SizedBox(height: AppSpacing.sm),
-          const ShimmerLoading(width: double.infinity, height: 120, borderRadius: AppSpacing.radiusLg),
+          SizedBox(height: AppSpacing.lg),
+          ShimmerLoading(width: 120, height: 24),
+          SizedBox(height: AppSpacing.sm),
+          ShimmerLoading(width: double.infinity, height: 120, borderRadius: AppSpacing.radiusLg),
         ],
       ),
     );

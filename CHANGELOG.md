@@ -4,6 +4,19 @@ All notable changes to the **Fomo IF** project will be documented in this file. 
 
 ---
 
+## [0.7.0] — 2026-07-23
+### Added
+- **Scan Real Food (AI) Feature**: Added an intelligent food recognition system powered by Google Gemini API (`gemini-3.5-flash`). Allows users to capture meal photos, preview and confirm them with standard transitions, perform structured JSON nutritional estimations (calories, protein, fat, carbs, confidence score), and log them securely.
+- **Adaptive Elevation & Premium Shadows**: Built a global premium shadow system via a centralized `AppCardStyle` helper. Light mode uses soft ambient shadows (`0.08` alpha), and Dark mode combines a deep ambient shadow (`0.45` alpha) with a subtle inner rim glow (`0.04` alpha, 2px blur) to produce a floating appearance without changing the background surface colors.
+- **Centralized Logger Service**: Added `LoggerService` wrapping the `logger` package to completely disable console logs in release builds, replacing all `print()` commands across the application.
+
+### Fixed
+- **Android Native Shutter UI Freeze**: Switched route transitions to platform-standard page routing, removing custom transit frame-drops that froze touch interaction states on Redmi Note 8 and similar devices.
+- **Native Activity Restoration Crash**: Ignored default root (`/`) deep links inside `lib/app.dart` to prevent native camera cold starts from resetting the router state back to Home.
+- **Codebase Analyzer Cleanup**: Resolved all 102 compiler and analyzer lints, warnings, and Material 3 deprecation messages (e.g. `surfaceVariant`, `withOpacity()`, dropdown `value` parameters).
+
+---
+
 ## [0.6.0] — 2026-07-20
 ### Added
 - **Decomposed Home Screen Widgets**: Extracted legacy helper methods in `home_screen.dart` into modular reusable widgets under `lib/features/home/presentation/widgets/` (`HomeHeader`, `FastingProgressCard`, `NextAlarmCard`, `CaloriesCard`, `CompletedCard`).

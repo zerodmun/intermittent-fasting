@@ -37,6 +37,26 @@ A modern, offline-first Flutter application for intermittent fasting tracking an
 - **Dark/Light theme** - System-aware with manual override
 - **Onboarding** - 4-step setup flow (Welcome, Profile, Goals, Schedule)
 
+### Visual & Premium Polish
+- **Adaptive Elevation & Shadow System**: Implemented a global premium card design system via `AppCard` using Material 3 `ColorScheme.surface` backgrounds, borderless outlines, and a modern shadow system:
+  - *Light Mode*: Soft ambient shadow (`alpha: 0.08`, `blurRadius: 16`).
+  - *Dark Mode*: Combined deep ambient shadow (`alpha: 0.45`, `blurRadius: 20`) and high-contrast neon inner rim glow (`alpha: 0.04`, `blurRadius: 2`) for exceptional card floating depth.
+  - *Corner Radius*: 24.0 corner radius matching modern platforms (Google Wallet, Apple Health).
+- **Unified Logger**: Consolidated code-wide diagnostic tracing using a safe production-aware `LoggerService`, completely stripping all console log execution in release builds.
+
+---
+
+## Setup & Configuration
+
+### Gemini AI API Key
+The **Scan Real Food (AI)** scanner requires a Google Gemini API Key.
+1. Create a `.env` file in the root directory of the project.
+2. Add your API key:
+   ```env
+   GEMINI_API_KEY=your_actual_google_gemini_api_key_here
+   ```
+3. Run `flutter pub get` and build the application.
+
 ---
 
 ## Screenshots
@@ -49,4 +69,5 @@ A modern, offline-first Flutter application for intermittent fasting tracking an
 </p>
 
 ---
+
 

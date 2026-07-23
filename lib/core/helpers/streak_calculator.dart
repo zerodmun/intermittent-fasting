@@ -50,12 +50,6 @@ class StreakCalculator {
         r.startTime.month == todayDate.month &&
         r.startTime.day == todayDate.day);
 
-    // Check if yesterday is completed
-    final isYesterdayCompleted = completedRecords.any((r) =>
-        r.startTime.year == yesterday.year &&
-        r.startTime.month == yesterday.month &&
-        r.startTime.day == yesterday.day);
-
     // Calculate current streak
     int currentStreak = 0;
     int longestStreak = 0;

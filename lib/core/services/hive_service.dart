@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:hive_ce/hive.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:fast_flow/core/services/logger_service.dart';
 
 import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
@@ -38,7 +38,7 @@ class HiveService {
     try {
       await Hive.initFlutter();
     } catch (e) {
-      print('HiveService: initFlutter failed: $e');
+      LoggerService.e('HiveService: initFlutter failed', e);
     }
 
     // Register adapters safely to avoid duplicate registration errors
@@ -76,7 +76,7 @@ class HiveService {
         Hive.registerAdapter(adapter);
       }
     } catch (e) {
-      print('HiveService: Failed to register adapter ${adapter.runtimeType}: $e');
+      LoggerService.e('HiveService: Failed to register adapter ${adapter.runtimeType}', e);
     }
   }
 
@@ -84,23 +84,23 @@ class HiveService {
     try {
       return await Hive.openBox<T>(name);
     } catch (e) {
-      print('HiveService: Error opening box "$name": $e. Attempting recovery via deletion...');
+      LoggerService.w('HiveService: Error opening box "$name": $e. Attempting recovery via deletion...');
       try {
         await Hive.deleteBoxFromDisk(name);
         return await Hive.openBox<T>(name);
       } catch (deletionError) {
-        print('HiveService: Deletion recovery failed for box "$name": $deletionError. Trying temporary path...');
+        LoggerService.e('HiveService: Deletion recovery failed for box "$name"', deletionError);
         try {
           final tempDir = await getTemporaryDirectory();
           return await Hive.openBox<T>('${name}_temp', path: tempDir.path);
         } catch (tempDirError) {
-          print('HiveService: Temp path recovery failed for box "$name": $tempDirError. Trying unique fallback box...');
+          LoggerService.e('HiveService: Temp path recovery failed for box "$name"', tempDirError);
           try {
             final tempDir = await getTemporaryDirectory();
             final uniqueName = '${name}_fallback_${DateTime.now().millisecondsSinceEpoch}';
             return await Hive.openBox<T>(uniqueName, path: tempDir.path);
           } catch (fallbackError) {
-            print('HiveService: Critical failure. Fallback box failed for "$name": $fallbackError. Rethrowing.');
+            LoggerService.e('HiveService: Critical failure. Fallback box failed for "$name"', fallbackError);
             rethrow;
           }
         }
@@ -356,7 +356,7 @@ class HiveService {
     try {
       return foodLogsBox.values.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (e) {
-      print('HiveService: Error reading food logs: $e');
+      LoggerService.e('HiveService: Error reading food logs', e);
       return [];
     }
   }

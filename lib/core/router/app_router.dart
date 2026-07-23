@@ -14,7 +14,10 @@ import 'package:fast_flow/features/body_composition/presentation/screens/progres
 import 'package:fast_flow/features/food/presentation/screens/food_scanner_screen.dart';
 import 'package:fast_flow/features/food/presentation/screens/barcode_scanner_screen.dart';
 import 'package:fast_flow/features/food/presentation/screens/product_result_screen.dart';
+import 'package:fast_flow/features/food/presentation/screens/ai_camera_preview_screen.dart';
+import 'package:fast_flow/features/food/presentation/screens/ai_food_result_screen.dart';
 import 'package:fast_flow/features/food/data/models/food_product.dart';
+import 'package:fast_flow/features/food/data/models/food_recognition_model.dart';
 import 'package:fast_flow/shared/widgets/app_scaffold.dart';
 
 /// App-wide route configuration using GoRouter with shell routing.
@@ -116,6 +119,25 @@ class AppRouter {
                     builder: (context, state) {
                       final product = state.extra as FoodProduct;
                       return ProductResultScreen(product: product);
+                    },
+                  ),
+                  GoRoute(
+                    path: 'ai-preview',
+                    builder: (context, state) {
+                      final imagePath = state.extra as String;
+                      return AiCameraPreviewScreen(imagePath: imagePath);
+                    },
+                  ),
+                  GoRoute(
+                    path: 'ai-result',
+                    builder: (context, state) {
+                      final extra = state.extra as Map<String, dynamic>;
+                      final imagePath = extra['imagePath'] as String;
+                      final result = extra['result'] as FoodRecognitionModel;
+                      return AiFoodResultScreen(
+                        imagePath: imagePath,
+                        result: result,
+                      );
                     },
                   ),
                 ],

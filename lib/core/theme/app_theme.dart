@@ -31,25 +31,25 @@ class AppTheme {
       useMaterial3: true,
       brightness: colorScheme.brightness,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: colorScheme.background,
+      scaffoldBackgroundColor: colorScheme.surface,
       extensions: [extension],
 
       // ── Typography & Text Theme ──
       textTheme: TextTheme(
-        displayLarge: AppTypography.displayLarge.copyWith(color: colorScheme.onBackground),
-        displayMedium: AppTypography.displayMedium.copyWith(color: colorScheme.onBackground),
-        displaySmall: AppTypography.displaySmall.copyWith(color: colorScheme.onBackground),
-        headlineLarge: AppTypography.headlineLarge.copyWith(color: colorScheme.onBackground),
-        headlineMedium: AppTypography.headlineMedium.copyWith(color: colorScheme.onBackground),
-        headlineSmall: AppTypography.headlineSmall.copyWith(color: colorScheme.onBackground),
-        titleLarge: AppTypography.titleLarge.copyWith(color: colorScheme.onBackground),
-        titleMedium: AppTypography.titleMedium.copyWith(color: colorScheme.onBackground),
-        titleSmall: AppTypography.titleSmall.copyWith(color: colorScheme.onBackground),
-        bodyLarge: AppTypography.bodyLarge.copyWith(color: colorScheme.onBackground),
-        bodyMedium: AppTypography.bodyMedium.copyWith(color: colorScheme.onBackground),
+        displayLarge: AppTypography.displayLarge.copyWith(color: colorScheme.onSurface),
+        displayMedium: AppTypography.displayMedium.copyWith(color: colorScheme.onSurface),
+        displaySmall: AppTypography.displaySmall.copyWith(color: colorScheme.onSurface),
+        headlineLarge: AppTypography.headlineLarge.copyWith(color: colorScheme.onSurface),
+        headlineMedium: AppTypography.headlineMedium.copyWith(color: colorScheme.onSurface),
+        headlineSmall: AppTypography.headlineSmall.copyWith(color: colorScheme.onSurface),
+        titleLarge: AppTypography.titleLarge.copyWith(color: colorScheme.onSurface),
+        titleMedium: AppTypography.titleMedium.copyWith(color: colorScheme.onSurface),
+        titleSmall: AppTypography.titleSmall.copyWith(color: colorScheme.onSurface),
+        bodyLarge: AppTypography.bodyLarge.copyWith(color: colorScheme.onSurface),
+        bodyMedium: AppTypography.bodyMedium.copyWith(color: colorScheme.onSurface),
         bodySmall: AppTypography.bodySmall.copyWith(color: colorScheme.onSurfaceVariant),
-        labelLarge: AppTypography.labelLarge.copyWith(color: colorScheme.onBackground),
-        labelMedium: AppTypography.labelMedium.copyWith(color: colorScheme.onBackground),
+        labelLarge: AppTypography.labelLarge.copyWith(color: colorScheme.onSurface),
+        labelMedium: AppTypography.labelMedium.copyWith(color: colorScheme.onSurface),
         labelSmall: AppTypography.labelSmall.copyWith(color: colorScheme.onSurfaceVariant),
       ),
 
@@ -58,10 +58,10 @@ class AppTheme {
         elevation: 0,
         centerTitle: true,
         backgroundColor: Colors.transparent,
-        foregroundColor: colorScheme.onBackground,
+        foregroundColor: colorScheme.onSurface,
         surfaceTintColor: Colors.transparent,
         titleTextStyle: AppTypography.titleLarge.copyWith(
-          color: colorScheme.onBackground,
+          color: colorScheme.onSurface,
         ),
       ),
 
@@ -126,7 +126,7 @@ class AppTheme {
       // ── Input Decoration ──
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: colorScheme.surfaceVariant,
+        fillColor: colorScheme.surfaceContainerHighest,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.md,
@@ -175,7 +175,7 @@ class AppTheme {
 
       // ── Chips ──
       chipTheme: ChipThemeData(
-        backgroundColor: colorScheme.surfaceVariant,
+        backgroundColor: colorScheme.surfaceContainerHighest,
         selectedColor: colorScheme.primaryContainer,
         labelStyle: AppTypography.labelMedium.copyWith(color: colorScheme.onSurface),
         secondaryLabelStyle: AppTypography.labelMedium.copyWith(color: colorScheme.onPrimaryContainer),
@@ -272,7 +272,7 @@ class AppTheme {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) return colorScheme.primaryContainer;
-          return colorScheme.surfaceVariant;
+          return colorScheme.surfaceContainerHighest;
         }),
       ),
 

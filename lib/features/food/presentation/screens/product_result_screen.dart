@@ -7,7 +7,6 @@ import 'package:fast_flow/core/extensions/context_extensions.dart';
 import 'package:fast_flow/shared/widgets/app_card.dart';
 import 'package:fast_flow/shared/widgets/app_button.dart';
 import 'package:fast_flow/features/food/presentation/providers/food_logs_provider.dart';
-import 'package:fast_flow/core/services/food_api_service.dart';
 import 'package:fast_flow/features/food/data/models/food_product.dart';
 import 'package:fast_flow/features/food/data/models/food_log_entry.dart';
 

@@ -5,7 +5,6 @@ import 'package:uuid/uuid.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import 'package:fast_flow/core/constants/app_spacing.dart';
-import 'package:fast_flow/core/constants/app_animations.dart';
 import 'package:fast_flow/core/extensions/context_extensions.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
 import 'package:fast_flow/shared/widgets/app_card.dart';
@@ -16,11 +15,9 @@ import 'package:fast_flow/shared/widgets/app_bottom_sheet.dart';
 import 'package:fast_flow/shared/widgets/body_silhouette.dart';
 import 'package:fast_flow/shared/widgets/metric_change_badge.dart';
 import 'package:fast_flow/shared/widgets/empty_state.dart';
-import 'package:fast_flow/shared/widgets/shimmer_loading.dart';
 import 'package:fast_flow/shared/widgets/section_header.dart';
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
 import 'package:fast_flow/features/weight/presentation/providers/weight_providers.dart';
-import 'package:fast_flow/features/onboarding/presentation/providers/onboarding_provider.dart';
 import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
 import 'package:fast_flow/features/body_composition/data/services/body_comp_service.dart';
 import 'package:fast_flow/features/body_composition/presentation/providers/body_comp_providers.dart';
@@ -735,7 +732,7 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
             vertical: AppSpacing.xs,
           ),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceVariant,
+            color: colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
           ),
           child: Text(
@@ -798,7 +795,7 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedChartMetric,
+                  initialValue: _selectedChartMetric,
                   decoration: InputDecoration(
                     labelText: 'Metric',
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -830,7 +827,7 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedChartFilter,
+                  initialValue: _selectedChartFilter,
                   decoration: InputDecoration(
                     labelText: 'Timeframe',
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -946,7 +943,7 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
 
           // Smart Insights Card
           if (insights.isNotEmpty) ...[
-            SectionHeader(title: 'Smart Insights'),
+            const SectionHeader(title: 'Smart Insights'),
             AppCard.outlined(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -991,7 +988,7 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
 
           // Recent Progress Summary (Table)
           if (changes != null) ...[
-            SectionHeader(title: 'Recent Changes'),
+            const SectionHeader(title: 'Recent Changes'),
             AppCard.elevated(
               child: Column(
                 children: [
@@ -1020,7 +1017,7 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
   }) {
     final theme = Theme.of(context);
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -1108,7 +1105,7 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
       insights.add('Congratulations! You have reached your target weight of ${profile.goalWeightKg} kg!');
     } else {
       final direction = latest.weightKg > profile.goalWeightKg ? 'lose' : 'gain';
-      insights.add('You are ${goalDiff.toStringAsFixed(1)} kg away from your target weight of ${profile.goalWeightKg} kg (${direction} goal).');
+      insights.add('You are ${goalDiff.toStringAsFixed(1)} kg away from your target weight of ${profile.goalWeightKg} kg ($direction goal).');
     }
 
     if (entries.length < 2) return insights;
@@ -1133,7 +1130,7 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
     final weightDiff = latest.weightKg - prev.weightKg;
     if (weightDiff != 0.0) {
       final verb = weightDiff < 0 ? 'decreased' : 'increased';
-      insights.add('Weight has ${verb} by ${weightDiff.abs().toStringAsFixed(1)} kg since your last entry.');
+      insights.add('Weight has $verb by ${weightDiff.abs().toStringAsFixed(1)} kg since your last entry.');
     }
 
     // 3. Body Fat & Lean Mass
@@ -1141,7 +1138,7 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
       final bfDiff = latestComp.bodyFatPercentage - prevComp.bodyFatPercentage;
       if (bfDiff != 0.0) {
         final verb = bfDiff < 0 ? 'decreased' : 'increased';
-        insights.add('Body Fat percentage has ${verb} by ${bfDiff.abs().toStringAsFixed(1)}% since your last entry.');
+        insights.add('Body Fat percentage has $verb by ${bfDiff.abs().toStringAsFixed(1)}% since your last entry.');
       }
 
       final lmDiff = latestComp.leanBodyMassKg - prevComp.leanBodyMassKg;
@@ -1162,7 +1159,7 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
       final waistDiff = latest.waistCm! - prev.waistCm!;
       if (waistDiff != 0.0) {
         final verb = waistDiff < 0 ? 'reduced' : 'increased';
-        insights.add('Waist circumference ${verb} by ${waistDiff.abs().toStringAsFixed(1)} cm.');
+        insights.add('Waist circumference $verb by ${waistDiff.abs().toStringAsFixed(1)} cm.');
       }
     }
 
@@ -1198,7 +1195,7 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceVariant,
+              color: colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
             ),
             child: Text(
@@ -1263,7 +1260,7 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
               ),
             ],
           ),
-          SizedBox(height: AppSpacing.xlg),
+          const SizedBox(height: AppSpacing.xlg),
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(

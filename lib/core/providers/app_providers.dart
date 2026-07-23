@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
@@ -6,6 +7,26 @@ import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
 import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
+
+class CurrentDateNotifier extends Notifier<DateTime> {
+  @override
+  DateTime build() {
+    final timer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      if (state != today) {
+        state = today;
+      }
+    });
+    ref.onDispose(() => timer.cancel());
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+}
+
+final currentDateProvider = NotifierProvider<CurrentDateNotifier, DateTime>(
+  CurrentDateNotifier.new,
+);
 
 final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
   final box = HiveService.instance.userProfileBox;
@@ -25,14 +46,21 @@ final fastingScheduleProvider = FutureProvider<FastingSchedule>((ref) async {
   return HiveService.instance.fastingSchedule;
 });
 
-final fastingRecordsProvider = FutureProvider<List<FastingRecord>>((ref) async {
-  final box = HiveService.instance.fastingRecordsBox;
-  final subscription = box.watch().listen((_) {
-    ref.invalidateSelf();
-  });
-  ref.onDispose(() => subscription.cancel());
-  return HiveService.instance.allFastingRecords;
-});
+class FastingRecordsNotifier extends Notifier<List<FastingRecord>> {
+  @override
+  List<FastingRecord> build() {
+    final box = HiveService.instance.fastingRecordsBox;
+    final subscription = box.watch().listen((_) {
+      state = HiveService.instance.allFastingRecords;
+    });
+    ref.onDispose(() => subscription.cancel());
+    return HiveService.instance.allFastingRecords;
+  }
+}
+
+final fastingRecordsProvider = NotifierProvider<FastingRecordsNotifier, List<FastingRecord>>(
+  FastingRecordsNotifier.new,
+);
 
 final weightEntriesProvider = FutureProvider<List<WeightEntry>>((ref) async {
   final box = HiveService.instance.weightEntriesBox;
@@ -44,10 +72,7 @@ final weightEntriesProvider = FutureProvider<List<WeightEntry>>((ref) async {
 });
 
 final streakProvider = Provider<StreakResult>((ref) {
-  final records = ref.watch(fastingRecordsProvider).maybeWhen(
-    data: (records) => records,
-    orElse: () => <FastingRecord>[],
-  );
+  final records = ref.watch(fastingRecordsProvider);
   return StreakCalculator.calculate(records);
 });
 

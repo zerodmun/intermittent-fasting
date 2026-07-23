@@ -1,26 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
 
-final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
-  return ThemeModeNotifier(ref);
-});
-
-class ThemeModeNotifier extends StateNotifier<ThemeMode> {
-  final Ref _ref;
-  ThemeModeNotifier(this._ref) : super(ThemeMode.system) {
-    _loadTheme();
-  }
-
-  Future<void> _loadTheme() async {
+class ThemeModeNotifier extends Notifier<ThemeMode> {
+  @override
+  ThemeMode build() {
     final themeStr = HiveService.instance.getSetting<String>('theme_mode');
     if (themeStr != null) {
-      state = ThemeMode.values.firstWhere(
+      return ThemeMode.values.firstWhere(
         (e) => e.name == themeStr,
         orElse: () => ThemeMode.system,
       );
     }
+    return ThemeMode.system;
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -29,19 +21,14 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   }
 }
 
-final notificationsEnabledProvider = StateNotifierProvider<NotificationsEnabledNotifier, bool>((ref) {
-  return NotificationsEnabledNotifier(ref);
-});
+final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
+  ThemeModeNotifier.new,
+);
 
-class NotificationsEnabledNotifier extends StateNotifier<bool> {
-  final Ref _ref;
-  NotificationsEnabledNotifier(this._ref) : super(true) {
-    _load();
-  }
-
-  Future<void> _load() async {
-    final enabled = HiveService.instance.getSetting<bool>('notifications_enabled') ?? true;
-    state = enabled;
+class NotificationsEnabledNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    return HiveService.instance.getSetting<bool>('notifications_enabled') ?? true;
   }
 
   Future<void> setEnabled(bool enabled) async {
@@ -50,19 +37,14 @@ class NotificationsEnabledNotifier extends StateNotifier<bool> {
   }
 }
 
-final defaultPlanIdProvider = StateNotifierProvider<DefaultPlanIdNotifier, String>((ref) {
-  return DefaultPlanIdNotifier(ref);
-});
+final notificationsEnabledProvider = NotifierProvider<NotificationsEnabledNotifier, bool>(
+  NotificationsEnabledNotifier.new,
+);
 
-class DefaultPlanIdNotifier extends StateNotifier<String> {
-  final Ref _ref;
-  DefaultPlanIdNotifier(this._ref) : super('16:8') {
-    _load();
-  }
-
-  Future<void> _load() async {
-    final planId = HiveService.instance.getSetting<String>('default_plan_id') ?? '16:8';
-    state = planId;
+class DefaultPlanIdNotifier extends Notifier<String> {
+  @override
+  String build() {
+    return HiveService.instance.getSetting<String>('default_plan_id') ?? '16:8';
   }
 
   Future<void> setPlanId(String planId) async {
@@ -71,18 +53,14 @@ class DefaultPlanIdNotifier extends StateNotifier<String> {
   }
 }
 
-final eatingNotificationsEnabledProvider = StateNotifierProvider<EatingNotificationsEnabledNotifier, bool>((ref) {
-  return EatingNotificationsEnabledNotifier();
-});
+final defaultPlanIdProvider = NotifierProvider<DefaultPlanIdNotifier, String>(
+  DefaultPlanIdNotifier.new,
+);
 
-class EatingNotificationsEnabledNotifier extends StateNotifier<bool> {
-  EatingNotificationsEnabledNotifier() : super(true) {
-    _load();
-  }
-
-  Future<void> _load() async {
-    final enabled = HiveService.instance.getSetting<bool>('eating_notification_enabled') ?? true;
-    state = enabled;
+class EatingNotificationsEnabledNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    return HiveService.instance.getSetting<bool>('eating_notification_enabled') ?? true;
   }
 
   Future<void> setEnabled(bool enabled) async {
@@ -91,18 +69,14 @@ class EatingNotificationsEnabledNotifier extends StateNotifier<bool> {
   }
 }
 
-final fastingNotificationsEnabledProvider = StateNotifierProvider<FastingNotificationsEnabledNotifier, bool>((ref) {
-  return FastingNotificationsEnabledNotifier();
-});
+final eatingNotificationsEnabledProvider = NotifierProvider<EatingNotificationsEnabledNotifier, bool>(
+  EatingNotificationsEnabledNotifier.new,
+);
 
-class FastingNotificationsEnabledNotifier extends StateNotifier<bool> {
-  FastingNotificationsEnabledNotifier() : super(true) {
-    _load();
-  }
-
-  Future<void> _load() async {
-    final enabled = HiveService.instance.getSetting<bool>('fasting_notification_enabled') ?? true;
-    state = enabled;
+class FastingNotificationsEnabledNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    return HiveService.instance.getSetting<bool>('fasting_notification_enabled') ?? true;
   }
 
   Future<void> setEnabled(bool enabled) async {
@@ -110,3 +84,7 @@ class FastingNotificationsEnabledNotifier extends StateNotifier<bool> {
     await HiveService.instance.setSetting('fasting_notification_enabled', enabled);
   }
 }
+
+final fastingNotificationsEnabledProvider = NotifierProvider<FastingNotificationsEnabledNotifier, bool>(
+  FastingNotificationsEnabledNotifier.new,
+);

@@ -6,6 +6,7 @@ import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_state.dart';
 import 'package:fast_flow/core/services/widget_sync_service.dart';
+import 'package:fast_flow/core/services/logger_service.dart';
 
 import 'timeline_generator.dart';
 import 'session_resolver.dart';
@@ -69,10 +70,7 @@ class FastingEngine {
     try {
       _tick();
     } catch (e, stack) {
-      if (kDebugMode) {
-        print('FastingEngine timer error: $e');
-        print(stack);
-      }
+      LoggerService.e('FastingEngine timer error', e, stack);
     }
   }
 
@@ -93,17 +91,20 @@ class FastingEngine {
       final sched = HiveService.instance.fastingSchedule;
       final scheduleStr = sched.dailySchedules.entries.map((e) => '[Day ${e.key}: Fast ${e.value.fastTimeFormatted}, Eat ${e.value.eatTimeFormatted}]').join('\n');
 
-      print('---------------------------');
-      print('NOW LOCAL: $now');
-      print('NOW UTC: ${now.toUtc()}');
-      print('TIMEZONE: $offsetStr');
-      print('ACTIVE SESSION START: ${_currentState!.activeWindowStart}');
-      print('ACTIVE SESSION END: ${_currentState!.activeWindowEnd}');
-      print('ELAPSED: ${_currentState!.elapsed}');
-      print('REMAINING: ${_currentState!.remaining}');
-      print('CURRENT STATUS: ${_currentState!.status}');
-      print('WEEKLY SCHEDULE USED:\n$scheduleStr');
-      print('---------------------------');
+      LoggerService.d(
+        'FastingEngine tick:\n'
+        '---------------------------\n'
+        'NOW LOCAL: $now\n'
+        'NOW UTC: ${now.toUtc()}\n'
+        'TIMEZONE: $offsetStr\n'
+        'ACTIVE SESSION START: ${_currentState!.activeWindowStart}\n'
+        'ACTIVE SESSION END: ${_currentState!.activeWindowEnd}\n'
+        'ELAPSED: ${_currentState!.elapsed}\n'
+        'REMAINING: ${_currentState!.remaining}\n'
+        'CURRENT STATUS: ${_currentState!.status}\n'
+        'WEEKLY SCHEDULE USED:\n$scheduleStr\n'
+        '---------------------------'
+      );
     }
 
     _notifyListeners();
@@ -150,7 +151,7 @@ class FastingEngine {
   FastingRecord? getRecordForSession(DateTime expectedStart) {
     // 1. Direct key match (deterministic ID format)
     final key = 'session_${expectedStart.millisecondsSinceEpoch}';
-    final recordByKey = HiveService.instance.fastingRecordsBox.get(key) as FastingRecord?;
+    final recordByKey = HiveService.instance.fastingRecordsBox.get(key);
     if (recordByKey != null) {
       return recordByKey;
     }

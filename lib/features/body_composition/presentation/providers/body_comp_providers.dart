@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fast_flow/features/onboarding/presentation/providers/onboarding_provider.dart';
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
 import 'package:fast_flow/features/weight/presentation/providers/weight_providers.dart';
 import 'package:fast_flow/features/body_composition/data/services/body_comp_service.dart';

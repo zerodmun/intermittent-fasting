@@ -55,9 +55,9 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
             borderRadius: BorderRadius.circular(widget.borderRadius),
             gradient: LinearGradient(
               colors: [
-                colorScheme.surfaceVariant,
+                colorScheme.surfaceContainerHighest,
                 colorScheme.outlineVariant.withValues(alpha: 0.5),
-                colorScheme.surfaceVariant,
+                colorScheme.surfaceContainerHighest,
               ],
               stops: const [0.3, 0.5, 0.7],
               begin: Alignment(_animation.value - 1.0, -0.3),
