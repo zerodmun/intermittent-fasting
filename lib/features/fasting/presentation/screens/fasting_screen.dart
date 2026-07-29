@@ -58,8 +58,7 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
                 children: [
                   _buildTabOption(0, 'Timer'),
                   _buildTabOption(1, 'Schedule'),
-                  _buildTabOption(2, 'Timeline'),
-                  _buildTabOption(3, 'Calendar'),
+                  _buildTabOption(2, 'Calendar'),
                 ],
               ),
             ),
@@ -114,8 +113,6 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
       case 1:
         return _buildScheduleSegment(state, notifier);
       case 2:
-        return _buildTimelineSegment(state);
-      case 3:
         return _buildCalendarSegment(state, notifier);
       case 0:
       default:
@@ -419,75 +416,7 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
     );
   }
 
-  // ── TIMELINE SEGMENT ──
-  Widget _buildTimelineSegment(FastingState? state) {
-    if (state == null) return const Center(child: CircularProgressIndicator());
 
-    final theme = Theme.of(context);
-    final days = ['Yesterday', 'Today', 'Tomorrow'];
-
-    return SingleChildScrollView(
-      key: const ValueKey('timeline_segment'),
-      padding: const EdgeInsets.all(AppSpacing.screenPadding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: List.generate(3, (idx) {
-          final date = DateTime.now().add(Duration(days: idx - 1));
-          final sched = state.schedule.getScheduleFor(date.weekday);
-          final record = _getRecordForDay(date);
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: AppCard.elevated(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        days[idx],
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (record != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: record.status == 'completed'
-                                ? context.colors.successContainer
-                                : theme.colorScheme.errorContainer,
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                          ),
-                          child: Text(
-                            record.status.toUpperCase(),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: record.status == 'completed'
-                                  ? context.colors.onSuccessContainer
-                                  : theme.colorScheme.onErrorContainer,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildTimelineRow('Scheduled Fast', '${_formatTime(sched.fastHour, sched.fastMin)} - ${_formatTime(sched.eatHour, sched.eatMin)}'),
-                  if (record != null) ...[
-                    _buildTimelineRow('Actual Fast', '${DateFormat('HH:mm').format(record.startTime)} - ${record.endTime != null ? DateFormat('HH:mm').format(record.endTime!) : "Active"}'),
-                    _buildTimelineRow('Logged Duration', record.actualDuration.toReadable),
-                    if (record.note != null && record.note!.isNotEmpty)
-                      _buildTimelineRow('Note', record.note!),
-                  ],
-                ],
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
 
   Widget _buildTimelineRow(String label, String value) {
     final theme = Theme.of(context);
