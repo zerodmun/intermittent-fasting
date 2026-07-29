@@ -53,7 +53,7 @@ lib/
 │   │   └── presentation/
 │   │       ├── providers/  # FoodLogsNotifier, foodLogsProvider
 │   │       └── screens/    # FoodScannerScreen, BarcodeScannerScreen, ProductResultScreen
-│   ├── statistics/          # StatisticsScreen (charts), nutrition details, food intake summaries
+│   ├── statistics/          # StatisticsScreen, AverageFastDetailScreen, ExerciseScreen (placeholder), WeeklyDetailScreen, MonthlyCalendarScreen, NutritionDetailsScreen
 │   ├── weight/              # WeightScreen (measurements, charts)
 │   └── settings/            # SettingsScreen
 └── shared/widgets/          # Reusable UI components
@@ -108,17 +108,23 @@ Resolves active and transition states chronologically using a strict search orde
 
 ---
 
-## Daily Transition Notifications
+## Daily Transition & Scheduled Reminder Notifications
 
-The application schedules local daily notifications exactly matching fasting and eating window start times:
-1. **Fasting Started Notification**:
-   - Title: `Time to Start Fasting`
-   - Body: `Your fasting window has started. Stay hydrated and good luck!`
-2. **Eating Window Started Notification**:
-   - Title: `Time to Eat`
-   - Body: `Your eating window has started. Enjoy your meal!`
+The application manages two categories of local notifications using exact alarms (`SCHEDULE_EXACT_ALARM` on Android) and timezone-safe scheduling (`tz.TZDateTime`):
 
-These notifications are fully rescheduled dynamically whenever the user updates settings or fasting hours, and they utilize exact alarms (`SCHEDULE_EXACT_ALARM` permissions on Android) with timezone-safe scheduling.
+### 1. Transition Notifications (IDs 1000+)
+*   **Fasting Started**: `Time to Fast` - "Your fasting window starts now."
+*   **Eating Window Started**: `Time to Eat` - "Congratulations! Your fasting session is complete."
+
+### 2. Scheduled Reminder Notifications (IDs 2000–2003)
+*   **10 Minutes Before Fasting Start** (ID 2000): `Fasting Starts Soon` - "Your fasting will begin in 10 minutes."
+*   **At Fasting Start** (ID 2001): `Fasting Started` - "Your fasting has officially begun."
+*   **10 Minutes Before Iftar** (ID 2002): `Iftar is Almost Here` - "Only 10 minutes remaining until it's time to break your fast."
+*   **At Iftar Time** (ID 2003): `It's Time to Break Your Fast` - "May your fasting be accepted. Enjoy your meal."
+
+### Sound Options & Scheduling
+*   **Delivered-Today Tracking**: Maintained via an in-memory set (`_deliveredToday`) that resets automatically at midnight. Notifications already delivered today are skipped during rescheduling.
+*   **Notification Sound Options**: Display options include **Default** (system default notification sound), **App Notification** (custom sound played from raw resources in `android/app/src/main/res/raw/`), and **Silent**. Includes automatic system sound fallback if the custom raw audio resource is unavailable.
 
 ---
 

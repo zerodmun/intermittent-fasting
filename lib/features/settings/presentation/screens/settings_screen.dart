@@ -22,6 +22,10 @@ class SettingsScreen extends ConsumerWidget {
     final notificationsEnabled = ref.watch(notificationsEnabledProvider);
     final eatingNotificationsEnabled = ref.watch(eatingNotificationsEnabledProvider);
     final fastingNotificationsEnabled = ref.watch(fastingNotificationsEnabledProvider);
+    final reminderFastingEnabled = ref.watch(reminderFastingEnabledProvider);
+    final reminderIftarEnabled = ref.watch(reminderIftarEnabledProvider);
+    final reminderSound = ref.watch(reminderSoundProvider);
+    final reminderVibration = ref.watch(reminderVibrationProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -151,6 +155,84 @@ class SettingsScreen extends ConsumerWidget {
                     },
                   ),
                 ],
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+
+          const SectionHeader(title: 'Fasting Reminders'),
+          AppCard.elevated(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Fasting Reminder',
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Notify 10 min before and at fasting start time.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  value: reminderFastingEnabled,
+                  onChanged: notificationsEnabled
+                      ? (val) async {
+                          await ref.read(reminderFastingEnabledProvider.notifier).setEnabled(val);
+                        }
+                      : null,
+                ),
+                const Divider(),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Iftar Reminder',
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Notify 10 min before and at iftar time.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  value: reminderIftarEnabled,
+                  onChanged: notificationsEnabled
+                      ? (val) async {
+                          await ref.read(reminderIftarEnabledProvider.notifier).setEnabled(val);
+                        }
+                      : null,
+                ),
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Notification Sound',
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    _soundDisplayName(reminderSound),
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  trailing: Icon(Icons.chevron_right_rounded, color: colorScheme.primary),
+                  onTap: notificationsEnabled
+                      ? () => _showSoundPicker(context, ref, reminderSound)
+                      : null,
+                ),
+                const Divider(),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Vibration',
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Vibrate on reminder notification.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  value: reminderVibration,
+                  onChanged: notificationsEnabled
+                      ? (val) async {
+                          await ref.read(reminderVibrationProvider.notifier).setEnabled(val);
+                        }
+                      : null,
+                ),
               ],
             ),
           ),
@@ -355,6 +437,84 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// Returns human-readable display name for the sound preference key
+  String _soundDisplayName(String soundKey) {
+    switch (soundKey) {
+      case 'app_notification':
+      case 'bell':
+      case 'adhan':
+        return 'App Notification';
+      case 'silent':
+        return 'Silent';
+      default:
+        return 'Default';
+    }
+  }
+
+  /// Shows a modal bottom sheet to pick the reminder notification sound
+  void _showSoundPicker(BuildContext context, WidgetRef ref, String currentSound) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    const sounds = [
+      {'key': 'default', 'label': 'Default', 'icon': Icons.notifications_active_rounded},
+      {'key': 'app_notification', 'label': 'App Notification', 'icon': Icons.notifications_rounded},
+      {'key': 'silent', 'label': 'Silent', 'icon': Icons.notifications_off_rounded},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.sm,
+                ),
+                child: Text(
+                  'Notification Sound',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ),
+              const Divider(),
+              ...sounds.map((sound) {
+                final key = sound['key'] as String;
+                final label = sound['label'] as String;
+                final icon = sound['icon'] as IconData;
+                final isSelected = currentSound == key ||
+                    (key == 'app_notification' && (currentSound == 'bell' || currentSound == 'adhan'));
+
+                return ListTile(
+                  leading: Icon(icon, color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant),
+                  title: Text(
+                    label,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? colorScheme.primary : null,
+                    ),
+                  ),
+                  trailing: isSelected
+                      ? Icon(Icons.check_circle_rounded, color: colorScheme.primary)
+                      : null,
+                  onTap: () {
+                    ref.read(reminderSoundProvider.notifier).setSound(key);
+                    Navigator.pop(sheetContext);
+                  },
+                );
+              }),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          ),
+        );
+      },
     );
   }
 }

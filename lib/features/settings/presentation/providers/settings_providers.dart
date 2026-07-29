@@ -88,3 +88,69 @@ class FastingNotificationsEnabledNotifier extends Notifier<bool> {
 final fastingNotificationsEnabledProvider = NotifierProvider<FastingNotificationsEnabledNotifier, bool>(
   FastingNotificationsEnabledNotifier.new,
 );
+
+// ── Fasting Reminder Providers ──
+
+class ReminderFastingEnabledNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    return HiveService.instance.getSetting<bool>('reminder_fasting_enabled') ?? true;
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = enabled;
+    await HiveService.instance.setSetting('reminder_fasting_enabled', enabled);
+  }
+}
+
+final reminderFastingEnabledProvider = NotifierProvider<ReminderFastingEnabledNotifier, bool>(
+  ReminderFastingEnabledNotifier.new,
+);
+
+class ReminderIftarEnabledNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    return HiveService.instance.getSetting<bool>('reminder_iftar_enabled') ?? true;
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = enabled;
+    await HiveService.instance.setSetting('reminder_iftar_enabled', enabled);
+  }
+}
+
+final reminderIftarEnabledProvider = NotifierProvider<ReminderIftarEnabledNotifier, bool>(
+  ReminderIftarEnabledNotifier.new,
+);
+
+class ReminderSoundNotifier extends Notifier<String> {
+  @override
+  String build() {
+    return HiveService.instance.getSetting<String>('reminder_sound') ?? 'default';
+  }
+
+  Future<void> setSound(String sound) async {
+    state = sound;
+    await HiveService.instance.setSetting('reminder_sound', sound);
+  }
+}
+
+final reminderSoundProvider = NotifierProvider<ReminderSoundNotifier, String>(
+  ReminderSoundNotifier.new,
+);
+
+class ReminderVibrationNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    return HiveService.instance.getSetting<bool>('reminder_vibration') ?? true;
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = enabled;
+    await HiveService.instance.setSetting('reminder_vibration', enabled);
+  }
+}
+
+final reminderVibrationProvider = NotifierProvider<ReminderVibrationNotifier, bool>(
+  ReminderVibrationNotifier.new,
+);

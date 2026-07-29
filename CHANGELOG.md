@@ -2,6 +2,16 @@
 
 All notable changes to the **Fomo IF** project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-07-29
+### Added
+- **Scheduled Fasting Reminder Notifications**: Extended the local notification engine (`NotificationService`) with 4 scheduled reminders (10 min before fasting, at fasting start, 10 min before Iftar, at Iftar time). Supports **Default**, **App Notification** (custom sound played from `android/app/src/main/res/raw/`), and **Silent** options, with vibration settings and in-memory delivered-today tracking (`_deliveredToday`).
+- **Fasting Reminders Settings Section**: Added dedicated control tiles in `SettingsScreen` and 4 Riverpod providers (`reminderFastingEnabledProvider`, `reminderIftarEnabledProvider`, `reminderSoundProvider`, `reminderVibrationProvider`) with a clean sound selector menu (**Default**, **App Notification**, **Silent**).
+- **Exercises Page Placeholder**: Created `ExerciseScreen` (`exercise_screen.dart`) as a standalone screen displaying exercise statistics placeholder content for upcoming updates.
+
+### Changed
+- **Relocated Total Fasted Metric**: Moved the **Total Fasted** stat from the main Statistics grid into the **Average Fast Details** screen (`average_fast_detail_screen.dart`) under Detailed Statistics.
+- **Replaced Stats Dashboard Card**: Replaced the **Total Fasted** card on the main Analytics screen (`statistics_screen.dart`) with the new **Exercises** card, connecting it directly to `ExerciseScreen`.
+
 ---
 
 ## [0.7.0] — 2026-07-23

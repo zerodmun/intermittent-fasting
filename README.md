@@ -7,6 +7,7 @@ A modern, offline-first Flutter application for intermittent fasting tracking an
 ### Fasting Tracker & Notifications
 - **Schedule-driven engine** - No start/stop buttons needed. The app automatically determines your fasting state from the current time and your daily schedule.
 - **Real-time countdown** - Live timer updating every second with circular progress ring
+- **Scheduled Fasting Reminders** - Configurable scheduled alerts (10 min before fasting, at fasting start, 10 min before Iftar, at Iftar time) with sound choices (**Default**, **App Notification**, **Silent**), graceful default sound fallback, and daily delivered-state tracking.
 - **Multiple fasting windows** - Different fasting/eating times for each day of the week
 - **Timeline view** - Yesterday, Today, Tomorrow with scheduled vs actual times
 - **Calendar view** - Monthly overview with completion markers
@@ -15,9 +16,11 @@ A modern, offline-first Flutter application for intermittent fasting tracking an
 - **Redesigned Notification UI** - Modern Material 3 custom style featuring dynamic stage calculations (e.g., `16:8 Fast`), percentage completion displays, and a clean thin horizontal progress indicator (4dp height).
 
 ### Nutrition & Calorie Tracker (Redesigned Statistics)
-- **Daily Calorie Requirement** - Miffln-St Jeor calorie needs calculation using user profiles (age, gender, height, weight) with custom activity multipliers and weight goals.
+- **Daily Calorie Requirement** - Mifflin-St Jeor calorie needs calculation using user profiles (age, gender, height, weight) with custom activity multipliers and weight goals.
 - **Nutrition Details Page** - Targets for calories, protein, fat, carbohydrates, fiber, and water intake with educational advice cards.
 - **Total Calories Consumed** - Real-time summation of calories from all food scanner history logs.
+- **Average Fast Details** - Comprehensive fast metrics incorporating relocated **Total Fasted** metrics alongside shortest, longest, and average fasting durations.
+- **Exercises Page Placeholder** - Modular exercise statistics placeholder card and dedicated page for future workout tracking features.
 - **Food Intake Summary Page** - Review calorie, protein, fat, carb, and fiber totals, and simulate logging via mock scanners.
 
 ### Body Composition & History

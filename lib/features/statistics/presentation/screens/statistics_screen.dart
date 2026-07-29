@@ -11,6 +11,7 @@ import 'package:fast_flow/features/statistics/presentation/screens/food_intake_s
 import 'package:fast_flow/features/statistics/presentation/screens/weekly_detail_screen.dart';
 import 'package:fast_flow/features/statistics/presentation/screens/monthly_calendar_screen.dart';
 import 'package:fast_flow/features/statistics/presentation/screens/average_fast_detail_screen.dart';
+import 'package:fast_flow/features/statistics/presentation/screens/exercise_screen.dart';
 import 'package:fast_flow/features/statistics/presentation/providers/statistics_provider.dart';
 import 'package:fast_flow/shared/widgets/app_card.dart';
 import 'package:fast_flow/shared/widgets/stat_card.dart';
@@ -289,10 +290,18 @@ class StatisticsScreen extends ConsumerWidget {
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: StatCard(
-                    icon: Icons.hourglass_empty_rounded,
-                    title: 'Total Fasted',
-                    value: '${stats.totalFastingHours.toStringAsFixed(1)}h',
+                    icon: Icons.fitness_center_rounded,
+                    title: 'Exercises',
+                    value: '0 mins',
                     iconColor: theme.colorScheme.tertiary,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ExerciseScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],

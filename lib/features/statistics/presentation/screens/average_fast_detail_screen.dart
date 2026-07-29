@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fast_flow/core/constants/app_spacing.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
+import 'package:fast_flow/features/statistics/presentation/providers/statistics_provider.dart';
 import 'package:fast_flow/shared/widgets/app_card.dart';
 
 class AverageFastDetailScreen extends ConsumerWidget {
@@ -21,6 +22,7 @@ class AverageFastDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final stats = ref.watch(statisticsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -99,6 +101,13 @@ class AverageFastDetailScreen extends ConsumerWidget {
                 AppCard.elevated(
                   child: Column(
                     children: [
+                      _buildStatDetailRow(
+                        context,
+                        label: 'Total Fasted',
+                        value: '${stats.totalFastingHours.toStringAsFixed(1)}h',
+                        color: colorScheme.tertiary,
+                      ),
+                      const Divider(height: AppSpacing.md),
                       _buildStatDetailRow(
                         context,
                         label: 'Total Completed Fasts',
