@@ -122,9 +122,41 @@ The application manages two categories of local notifications using exact alarms
 *   **10 Minutes Before Iftar** (ID 2002): `Iftar is Almost Here` - "Only 10 minutes remaining until it's time to break your fast."
 *   **At Iftar Time** (ID 2003): `It's Time to Break Your Fast` - "May your fasting be accepted. Enjoy your meal."
 
-### Sound Options & Scheduling
-*   **Delivered-Today Tracking**: Maintained via an in-memory set (`_deliveredToday`) that resets automatically at midnight. Notifications already delivered today are skipped during rescheduling.
-*   **Notification Sound Options**: Display options include **Default** (system default notification sound), **App Notification** (custom sound played from raw resources in `android/app/src/main/res/raw/`), and **Silent**. Includes automatic system sound fallback if the custom raw audio resource is unavailable.
+### Offline-First, Reliable, Self-Healing Notification Scheduler Architecture
+The local notification engine ([`NotificationService`](file:///Users/tentendigitalindonesia/Downloads/XxX/Apps/intermittent-fasting/lib/core/services/notification_service.dart)) follows an **offline-first, battery-efficient, deterministic, self-healing architecture**:
+
+1. **Write-Only AlarmManager Execution Target**: `AlarmManager` is an execution target, not a queryable state provider. State validation and integrity checking rely strictly on Database (Primary Source of Truth) $\rightarrow$ Expected Reminder Schedule $\rightarrow$ Optimization Cache (`_currentlyScheduledReminders`).
+2. **Zero Battery Overhead**: No `Timer.periodic()`, polling loops, infinite loops, or background clock monitoring. CPU returns to idle immediately after native alarm registration (`AndroidScheduleMode.exactAllowWhileIdle`).
+3. **10-Step Deterministic Lifecycle**:
+   * Schedule Validation (`fastStart < fastEnd`)
+   * Midnight Rollover Reset (`_resetDeliveredIfNewDay()`)
+   * Target Reminder Generation (IDs `2000`–`2003`)
+   * Integrity Check & Idempotency Evaluation
+   * Differential Rescheduling (cancelling ONLY obsolete alarms)
+   * Independent Execution (isolated `try-catch` per reminder)
+   * Immediate Cache Synchronization
+   * Structured Diagnostic Summary Logging
+4. **Dedicated Sound Channels**: Channel ID sound preference mapping (`fasting_reminders`, `fasting_reminders_app`, `fasting_reminders_silent`).
+5. **Boot & Package Recovery**: Declared `ScheduledNotificationReceiver` and `ScheduledNotificationBootReceiver` in `AndroidManifest.xml` for `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED` intents.
+6. **Modular On-Demand Diagnostics**: Exposes `NotificationService.instance.getDiagnostics()` snapshot inspector executing strictly on-demand.
+
+### Notification & Widget Settings Architecture
+All notification configuration options and widget sync preferences are modularized into dedicated top-level sections on [`SettingsScreen`](file:///Users/tentendigitalindonesia/Downloads/XxX/Apps/intermittent-fasting/lib/features/settings/presentation/screens/settings_screen.dart):
+1. **Notification Section**: Section header `Notification` with single card `Notification Settings` leading to [`NotificationSettingsScreen`](file:///Users/tentendigitalindonesia/Downloads/XxX/Apps/intermittent-fasting/lib/features/settings/presentation/screens/notification_settings_screen.dart) (`/settings/notifications`). Manages master switch (`notifications_enabled`), system permission status checker, fasting reminders, sound picker sheet, vibration, and window transition alerts.
+2. **Widgets & Persistent Notification Section**: Section header `Widgets & Persistent Notification` with single card `Widgets & Persistent Notification` leading to [`WidgetsNotificationSettingsScreen`](file:///Users/tentendigitalindonesia/Downloads/XxX/Apps/intermittent-fasting/lib/features/settings/presentation/screens/widgets_notification_settings_screen.dart) (`/settings/widgets-notification`). Manages home screen widgets (`widgetEnabled`, `progressRingEnabled`, `bodyFatEnabled`, `weightEnabled`) and persistent drawer notifications (`notificationEnabled`, `liveCountdownEnabled`).
+
+### Standalone Exercises Module (Workout Journal)
+The **Exercises Module** ([`ExerciseScreen`](file:///Users/tentendigitalindonesia/Downloads/XxX/Apps/intermittent-fasting/lib/features/statistics/presentation/screens/exercise_screen.dart)) operates as a completely decoupled, standalone workout journal. It does **not** modify or integrate with fasting timers, fasting streaks, TDEE, consumed calories, weight goals, or notification scheduling.
+
+* **Domain Entities**:
+  * `WorkoutLog` ([`workout_log.dart`](file:///Users/tentendigitalindonesia/Downloads/XxX/Apps/intermittent-fasting/lib/features/statistics/domain/entities/workout_log.dart)): Encapsulates workout ID, title, date, duration, exercise list (`ExerciseItem`), and notes.
+  * `ExerciseItem`: Exercise name, sets, reps, weight ($\text{kg}$), and notes.
+* **Calorie Calculation Methodology**:
+  * ACSM / Compendium MET formula: $\text{Calories} = \text{MET} \times \text{BodyWeight (kg)} \times \text{Duration (hours)}$.
+  * Refined MET estimation based on resistance volume ($\text{totalVolumeKg}$) and sets density per minute.
+  * Explicitly displays an **Estimated Calculation Accuracy** badge ($\approx 70\%$) and explanatory notes without claiming scientific precision.
+* **Workout Statistics Header & Card Sync**: Cumulative stats for Total Workouts, Total Exercises, Total Sets, Total Volume ($\text{kg}$), Total Duration ($\text{min}$), and Total Estimated Calories Burned ($\text{kcal}$). Stored workout duration stays 100% synchronized across the Exercises header and main Statistics dashboard cards.
+* **Unified UI Action Pattern**: Replaced duplicate Floating Action Buttons across data-entry screens ([`ExerciseScreen`](file:///Users/tentendigitalindonesia/Downloads/XxX/Apps/intermittent-fasting/lib/features/statistics/presentation/screens/exercise_screen.dart), [`FoodIntakeSummaryScreen`](file:///Users/tentendigitalindonesia/Downloads/XxX/Apps/intermittent-fasting/lib/features/statistics/presentation/screens/food_intake_summary_screen.dart), and [`BodyCompScreen`](file:///Users/tentendigitalindonesia/Downloads/XxX/Apps/intermittent-fasting/lib/features/body_composition/presentation/screens/body_comp_screen.dart)) with clean, top-right AppBar action text buttons with icons (`+ Workout`, `+ Food`, `+ Record`).
 
 ---
 

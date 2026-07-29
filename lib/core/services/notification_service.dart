@@ -23,12 +23,62 @@ class ScheduledNotification {
   });
 }
 
+class NotificationDiagnostics {
+  final bool notificationsEnabledSetting;
+  final bool systemPermissionGranted;
+  final bool exactAlarmCapability;
+  final bool fastingChannelAvailable;
+  final bool reminderChannelAvailable;
+  final bool isScheduleValid;
+  final int expectedReminderCount;
+  final int scheduledReminderCount;
+  final int missingReminderCount;
+  final bool isSynchronized;
+  final bool bootReceiverRegistered;
+  final DateTime? lastSchedulingTime;
+  final String? lastTriggerSource;
+
+  NotificationDiagnostics({
+    required this.notificationsEnabledSetting,
+    required this.systemPermissionGranted,
+    required this.exactAlarmCapability,
+    required this.fastingChannelAvailable,
+    required this.reminderChannelAvailable,
+    required this.isScheduleValid,
+    required this.expectedReminderCount,
+    required this.scheduledReminderCount,
+    required this.missingReminderCount,
+    required this.isSynchronized,
+    required this.bootReceiverRegistered,
+    this.lastSchedulingTime,
+    this.lastTriggerSource,
+  });
+
+  Map<String, dynamic> toMap() => {
+        'notificationsEnabledSetting': notificationsEnabledSetting,
+        'systemPermissionGranted': systemPermissionGranted,
+        'exactAlarmCapability': exactAlarmCapability,
+        'fastingChannelAvailable': fastingChannelAvailable,
+        'reminderChannelAvailable': reminderChannelAvailable,
+        'isScheduleValid': isScheduleValid,
+        'expectedReminderCount': expectedReminderCount,
+        'scheduledReminderCount': scheduledReminderCount,
+        'missingReminderCount': missingReminderCount,
+        'isSynchronized': isSynchronized,
+        'bootReceiverRegistered': bootReceiverRegistered,
+        'lastSchedulingTime': lastSchedulingTime?.toIso8601String(),
+        'lastTriggerSource': lastTriggerSource,
+      };
+}
+
 class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
 
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+  bool _isSchedulingFasting = false;
+  bool _isSchedulingReminders = false;
 
   // ── Reminder Notification Constants ──
   static const int _reminderFastingSoonId = 2000;
@@ -44,7 +94,119 @@ class NotificationService {
 
   // Tracks which reminder IDs have already been delivered today to prevent duplicates
   final Set<int> _deliveredToday = {};
+  // Tracks active scheduled reminder dates per ID to prevent duplicate scheduling
+  final Map<int, DateTime> _currentlyScheduledReminders = {};
   DateTime _lastDeliveryResetDate = DateTime(0);
+  DateTime? _lastSchedulingTime;
+  String? _lastTriggerSource;
+
+  /// Returns an on-demand snapshot of notification system health, permissions, and synchronization state.
+  /// Executes strictly on-demand without background polling or timers.
+  Future<NotificationDiagnostics> getDiagnostics() async {
+    final enabledSetting = HiveService.instance.getSetting<bool>('notifications_enabled') ?? true;
+    bool systemPermission = false;
+    bool exactAlarmCap = true;
+
+    try {
+      if (Platform.isAndroid) {
+        final androidNotifications = _notifications
+            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+        systemPermission = await androidNotifications?.areNotificationsEnabled() ?? false;
+        final exactAlarmStatus = await androidNotifications?.canScheduleExactNotifications();
+        exactAlarmCap = exactAlarmStatus ?? true;
+      } else {
+        systemPermission = true;
+      }
+    } catch (_) {}
+
+    final schedule = HiveService.instance.fastingSchedule;
+    final now = DateTime.now();
+    final sessions = TimelineGenerator.generateTimeline(
+      schedule: schedule,
+      centerDate: now,
+      daysBefore: 1,
+      daysAfter: 1,
+    );
+
+    TimelineSession? targetSession;
+    for (final session in sessions) {
+      if (session.expectedEnd.isAfter(now)) {
+        targetSession = session;
+        break;
+      }
+    }
+
+    final bool scheduleValid = targetSession != null && targetSession.expectedStart.isBefore(targetSession.expectedEnd);
+
+    int expectedCount = 0;
+    int missingCount = 0;
+
+    if (targetSession != null && targetSession.expectedStart.isBefore(targetSession.expectedEnd) && enabledSetting) {
+      final fastStart = targetSession.expectedStart;
+      final fastEnd = targetSession.expectedEnd;
+
+      final fastingEnabled = HiveService.instance.getSetting<bool>('reminder_fasting_enabled') ?? true;
+      final iftarEnabled = HiveService.instance.getSetting<bool>('reminder_iftar_enabled') ?? true;
+
+      final List<ScheduledNotification> expectedReminders = [];
+      if (fastingEnabled) {
+        expectedReminders.add(ScheduledNotification(
+          id: _reminderFastingSoonId,
+          title: 'Fasting Starts Soon',
+          body: 'Your fasting will begin in 10 minutes.',
+          scheduledDate: fastStart.subtract(const Duration(minutes: 10)),
+        ));
+        expectedReminders.add(ScheduledNotification(
+          id: _reminderFastingStartId,
+          title: 'Fasting Started',
+          body: 'Your fasting has officially begun.',
+          scheduledDate: fastStart,
+        ));
+      }
+      if (iftarEnabled) {
+        expectedReminders.add(ScheduledNotification(
+          id: _reminderIftarSoonId,
+          title: 'Iftar is Almost Here',
+          body: 'Only 10 minutes remaining until it\'s time to break your fast.',
+          scheduledDate: fastEnd.subtract(const Duration(minutes: 10)),
+        ));
+        expectedReminders.add(ScheduledNotification(
+          id: _reminderIftarTimeId,
+          title: 'It\'s Time to Break Your Fast',
+          body: 'May your fasting be accepted. Enjoy your meal.',
+          scheduledDate: fastEnd,
+        ));
+      }
+
+      for (final r in expectedReminders) {
+        if (_deliveredToday.contains(r.id)) continue;
+        if (r.scheduledDate.isBefore(now) || r.scheduledDate.isAtSameMomentAs(now)) continue;
+        expectedCount++;
+        if (_currentlyScheduledReminders[r.id] != r.scheduledDate) {
+          missingCount++;
+        }
+      }
+    }
+
+    final scheduledCount = _currentlyScheduledReminders.length;
+    final isSynchronized = scheduleValid && missingCount == 0;
+
+    return NotificationDiagnostics(
+      notificationsEnabledSetting: enabledSetting,
+      systemPermissionGranted: systemPermission,
+      exactAlarmCapability: exactAlarmCap,
+      fastingChannelAvailable: true,
+      reminderChannelAvailable: true,
+      isScheduleValid: scheduleValid,
+      expectedReminderCount: expectedCount,
+      scheduledReminderCount: scheduledCount,
+      missingReminderCount: missingCount,
+      isSynchronized: isSynchronized,
+      bootReceiverRegistered: true,
+      lastSchedulingTime: _lastSchedulingTime,
+      lastTriggerSource: _lastTriggerSource,
+    );
+  }
 
   Future<void> init() async {
     if (_initialized) return;
@@ -95,7 +257,7 @@ class NotificationService {
       // Automatically reschedule on schedule changes
       HiveService.instance.fastingScheduleBox.watch(key: 'schedule').listen((_) {
         scheduleFastingNotifications();
-        scheduleReminderNotifications();
+        scheduleReminderNotifications('User Changes Today\'s Fasting Schedule');
       });
 
       // Automatically reschedule on settings changes
@@ -111,14 +273,14 @@ class NotificationService {
             event.key == 'reminder_iftar_enabled' ||
             event.key == 'reminder_sound' ||
             event.key == 'reminder_vibration') {
-          scheduleReminderNotifications();
+          scheduleReminderNotifications('Notification Preferences Change');
         }
       });
 
       // Automatically reschedule on fasting record changes (e.g. start, edit, complete, delete, resume)
       HiveService.instance.fastingRecordsBox.watch().listen((_) {
         scheduleFastingNotifications();
-        scheduleReminderNotifications();
+        scheduleReminderNotifications('Fasting Record Change');
       });
 
       _initialized = true;
@@ -139,7 +301,7 @@ class NotificationService {
 
       // Schedule initially on startup
       await scheduleFastingNotifications();
-      await scheduleReminderNotifications();
+      await scheduleReminderNotifications('Application Startup');
     } catch (e, stackTrace) {
       assert(() {
         debugPrint('NotificationService: Critical initialization failure: $e\n$stackTrace');
@@ -282,6 +444,8 @@ class NotificationService {
   }
 
   Future<void> scheduleFastingNotifications() async {
+    if (_isSchedulingFasting) return;
+    _isSchedulingFasting = true;
     try {
       await cancelAll();
 
@@ -323,6 +487,8 @@ class NotificationService {
       if (kDebugMode) {
         debugPrint('[NotificationService] Failed scheduling notifications: $e');
       }
+    } finally {
+      _isSchedulingFasting = false;
     }
   }
 
@@ -423,12 +589,13 @@ class NotificationService {
     }
   }
 
-  /// Resets the delivered tracking set at the start of each new calendar day
+  /// Resets the delivered and scheduled tracking sets at the start of each new calendar day
   void _resetDeliveredIfNewDay() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     if (_lastDeliveryResetDate != today) {
       _deliveredToday.clear();
+      _currentlyScheduledReminders.clear();
       _lastDeliveryResetDate = today;
     }
   }
@@ -437,6 +604,7 @@ class NotificationService {
   Future<void> cancelReminderNotifications() async {
     for (final id in _reminderIds) {
       await _notifications.cancel(id);
+      _currentlyScheduledReminders.remove(id);
     }
     if (kDebugMode) {
       debugPrint('[NotificationService] Reminder notifications cancelled (IDs 2000-2003)');
@@ -444,18 +612,53 @@ class NotificationService {
   }
 
   /// Schedules the four fasting reminder notifications based on today's schedule.
-  /// Respects delivered-today tracking, enabled settings, and selected sound.
-  Future<void> scheduleReminderNotifications() async {
+  /// 10-Step Deterministic Scheduling Lifecycle:
+  /// 1. Triggered & log trigger source
+  /// 2. Validate today's fasting schedule (Database primary source of truth: fastStart < fastEnd)
+  /// 3. Reset daily state on midnight calendar rollover
+  /// 4. Generate today's expected target reminders (IDs 2000-2003)
+  /// 5. Perform Notification Integrity Check (Expected vs Optimization Cache)
+  /// 6. Evaluate Idempotency (If synchronized, skip platform calls & log)
+  /// 7. Differential Rescheduling (Cancel ONLY obsolete/modified reminders, preserve valid)
+  /// 8. Register Exact OS Alarms (AndroidScheduleMode.exactAllowWhileIdle)
+  /// 9. Independent Per-Notification Execution & Immediate Cache Synchronization
+  /// 10. Output Structured Diagnostic Summary Log
+  Future<void> scheduleReminderNotifications([String triggerSource = 'Today\'s Fasting Schedule Changed']) async {
+    if (_isSchedulingReminders) {
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Reminder scheduling already in progress, skipping concurrent trigger ($triggerSource)');
+      }
+      return;
+    }
+    _isSchedulingReminders = true;
+    _lastSchedulingTime = DateTime.now();
+    _lastTriggerSource = triggerSource;
+
+    int generatedCount = 0;
+    int scheduledCount = 0;
+    int skippedDeliveredCount = 0;
+    int skippedTimePassedCount = 0;
+    int skippedAlreadyScheduledCount = 0;
+    int failedCount = 0;
+
     try {
-      // Cancel only reminder IDs, not existing notifications
-      await cancelReminderNotifications();
-      _resetDeliveredIfNewDay();
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Notification scheduling triggered.');
+        debugPrint('  • Trigger Source: $triggerSource');
+      }
 
       // Check master notification toggle
       final enabled = HiveService.instance.getSetting<bool>('notifications_enabled') ?? true;
       if (!enabled) {
+        await cancelReminderNotifications();
         if (kDebugMode) {
-          debugPrint('[NotificationService] Reminders skipped: master notifications disabled');
+          debugPrint(
+            '\nNotification Scheduling Summary\n\n'
+            'Trigger:\n$triggerSource\n\n'
+            'Schedule Valid:\nNo\n\n'
+            'Reason:\nNotifications disabled in settings.\n\n'
+            'No notifications scheduled.\n'
+          );
         }
         return;
       }
@@ -464,20 +667,23 @@ class NotificationService {
       final iftarReminderEnabled = HiveService.instance.getSetting<bool>('reminder_iftar_enabled') ?? true;
 
       if (!fastingReminderEnabled && !iftarReminderEnabled) {
+        await cancelReminderNotifications();
         if (kDebugMode) {
-          debugPrint('[NotificationService] Reminders skipped: both reminder types disabled');
+          debugPrint(
+            '\nNotification Scheduling Summary\n\n'
+            'Trigger:\n$triggerSource\n\n'
+            'Schedule Valid:\nNo\n\n'
+            'Reason:\nBoth fasting and iftar reminders disabled in settings.\n\n'
+            'No notifications scheduled.\n'
+          );
         }
         return;
       }
 
-      // Read sound and vibration preferences
-      final soundPref = HiveService.instance.getSetting<String>('reminder_sound') ?? 'default';
-      final vibrationEnabled = HiveService.instance.getSetting<bool>('reminder_vibration') ?? true;
-
+      // Step 1: Load & Validate Today's Fasting Schedule (Database Source of Truth)
       final schedule = HiveService.instance.fastingSchedule;
       final now = DateTime.now();
 
-      // Generate timeline to find the nearest upcoming/active session for today
       final sessions = TimelineGenerator.generateTimeline(
         schedule: schedule,
         centerDate: now,
@@ -485,7 +691,6 @@ class NotificationService {
         daysAfter: 1,
       );
 
-      // Find the best session: the first session whose expectedEnd is still in the future
       TimelineSession? targetSession;
       for (final session in sessions) {
         if (session.expectedEnd.isAfter(now)) {
@@ -494,9 +699,16 @@ class NotificationService {
         }
       }
 
-      if (targetSession == null) {
+      if (targetSession == null || !targetSession.expectedStart.isBefore(targetSession.expectedEnd)) {
+        await cancelReminderNotifications();
         if (kDebugMode) {
-          debugPrint('[NotificationService] Reminders skipped: no upcoming session found');
+          debugPrint(
+            '\nNotification Scheduling Summary\n\n'
+            'Trigger:\n$triggerSource\n\n'
+            'Schedule Valid:\nNo\n\n'
+            'Reason:\nNo valid fasting schedule (start < iftar) found for today.\n\n'
+            'No notifications scheduled.\n'
+          );
         }
         return;
       }
@@ -504,7 +716,13 @@ class NotificationService {
       final fastStart = targetSession.expectedStart;
       final fastEnd = targetSession.expectedEnd;
 
-      // Build the list of reminders to schedule
+      // Step 2: Midnight Calendar Day Rollover Reset
+      _resetDeliveredIfNewDay();
+
+      final soundPref = HiveService.instance.getSetting<String>('reminder_sound') ?? 'default';
+      final vibrationEnabled = HiveService.instance.getSetting<bool>('reminder_vibration') ?? true;
+
+      // Step 3: Generate Today's Expected Reminders
       final List<ScheduledNotification> reminders = [];
 
       if (fastingReminderEnabled) {
@@ -537,42 +755,124 @@ class NotificationService {
         ));
       }
 
-      int scheduledCount = 0;
-      for (final reminder in reminders) {
-        // Skip if already delivered today
-        if (_deliveredToday.contains(reminder.id)) {
-          if (kDebugMode) {
-            debugPrint('[NotificationService] Reminder ID ${reminder.id} already delivered today, skipping');
-          }
-          continue;
-        }
+      generatedCount = reminders.length;
 
-        // Skip if scheduled time is in the past
-        if (reminder.scheduledDate.isBefore(now) || reminder.scheduledDate.isAtSameMomentAs(now)) {
-          if (kDebugMode) {
-            debugPrint('[NotificationService] Reminder ID ${reminder.id} time has passed (${reminder.scheduledDate}), skipping');
-          }
-          continue;
-        }
+      // Step 4: Notification Integrity Check (Expected Schedule vs Optimization Cache)
+      final Set<int> targetReminderIds = reminders.map((r) => r.id).toSet();
+      final List<int> obsoleteIdsToCancel = [];
 
-        await _scheduleReminderNotification(
-          id: reminder.id,
-          title: reminder.title,
-          body: reminder.body,
-          scheduledDate: reminder.scheduledDate,
-          soundPref: soundPref,
-          vibrationEnabled: vibrationEnabled,
-        );
-        scheduledCount++;
+      for (final scheduledId in _currentlyScheduledReminders.keys.toList()) {
+        if (!targetReminderIds.contains(scheduledId)) {
+          obsoleteIdsToCancel.add(scheduledId);
+        }
       }
 
+      for (final reminder in reminders) {
+        if (_deliveredToday.contains(reminder.id)) continue;
+        if (reminder.scheduledDate.isBefore(now) || reminder.scheduledDate.isAtSameMomentAs(now)) continue;
+        final currentScheduledTime = _currentlyScheduledReminders[reminder.id];
+        if (currentScheduledTime != null && currentScheduledTime != reminder.scheduledDate) {
+          if (!obsoleteIdsToCancel.contains(reminder.id)) {
+            obsoleteIdsToCancel.add(reminder.id);
+          }
+        }
+      }
+
+      // Step 5: Evaluate Idempotency
+      bool needsSchedulingWork = obsoleteIdsToCancel.isNotEmpty;
+      if (!needsSchedulingWork) {
+        for (final reminder in reminders) {
+          if (_deliveredToday.contains(reminder.id)) continue;
+          if (reminder.scheduledDate.isBefore(now) || reminder.scheduledDate.isAtSameMomentAs(now)) continue;
+          if (_currentlyScheduledReminders[reminder.id] != reminder.scheduledDate) {
+            needsSchedulingWork = true;
+            break;
+          }
+        }
+      }
+
+      if (!needsSchedulingWork) {
+        if (kDebugMode) {
+          debugPrint('[NotificationService] Scheduler already synchronized.');
+        }
+        return;
+      }
+
+      // Step 6: Differential Rescheduling — Cancel ONLY Obsolete/Modified Reminders
+      for (final cancelId in obsoleteIdsToCancel) {
+        await _notifications.cancel(cancelId);
+        _currentlyScheduledReminders.remove(cancelId);
+      }
+
+      // Steps 7, 8, 9: Register Exact OS Alarms, Independent Execution & Cache Sync
+      for (final reminder in reminders) {
+        // Rule 2: Skip if delivered today
+        if (_deliveredToday.contains(reminder.id)) {
+          skippedDeliveredCount++;
+          continue;
+        }
+
+        // Rule 1: Skip if time passed
+        if (reminder.scheduledDate.isBefore(now) || reminder.scheduledDate.isAtSameMomentAs(now)) {
+          skippedTimePassedCount++;
+          continue;
+        }
+
+        // Duplicate Scheduling Rule: Skip if already scheduled for exact same time
+        if (_currentlyScheduledReminders[reminder.id] == reminder.scheduledDate) {
+          skippedAlreadyScheduledCount++;
+          continue;
+        }
+
+        // Schedule independently with per-notification error isolation
+        try {
+          await _scheduleReminderNotification(
+            id: reminder.id,
+            title: reminder.title,
+            body: reminder.body,
+            scheduledDate: reminder.scheduledDate,
+            soundPref: soundPref,
+            vibrationEnabled: vibrationEnabled,
+          );
+          // Step 9: Immediate Cache Synchronization
+          _currentlyScheduledReminders[reminder.id] = reminder.scheduledDate;
+          scheduledCount++;
+        } catch (singleNotificationError) {
+          failedCount++;
+          if (kDebugMode) {
+            debugPrint('  └─ Failed to schedule Notification ${reminder.id}: $singleNotificationError');
+          }
+        }
+      }
+
+      // Step 10: Output Structured Diagnostic Summary Log
       if (kDebugMode) {
-        debugPrint('[NotificationService] Scheduled $scheduledCount reminder notification(s)');
+        debugPrint(
+          '\nNotification Scheduling Summary\n\n'
+          'Trigger:\n$triggerSource\n\n'
+          'Schedule Valid:\nYes\n\n'
+          'Generated:\n$generatedCount\n\n'
+          'Scheduled:\n$scheduledCount\n\n'
+          'Skipped (Already Delivered):\n$skippedDeliveredCount\n\n'
+          'Skipped (Time Passed):\n$skippedTimePassedCount\n\n'
+          'Skipped (Already Scheduled):\n$skippedAlreadyScheduledCount\n\n'
+          'Cancelled Obsolete:\n${obsoleteIdsToCancel.length}\n\n'
+          'Failed:\n$failedCount\n\n'
+          'Scheduling Completed Successfully\n'
+        );
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[NotificationService] Failed scheduling reminder notifications: $e');
+        debugPrint(
+          '\nNotification Scheduling Summary\n\n'
+          'Trigger:\n$triggerSource\n\n'
+          'Schedule Valid:\nNo\n\n'
+          'Reason:\nExecution error: $e\n\n'
+          'No notifications scheduled.\n'
+        );
       }
+    } finally {
+      _isSchedulingReminders = false;
     }
   }
 

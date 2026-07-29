@@ -57,6 +57,23 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Body Composition'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.sm),
+            child: TextButton.icon(
+              onPressed: () {
+                final profileAsync = ref.read(userProfileProvider);
+                profileAsync.whenData((profile) {
+                  if (profile != null) {
+                    _showAddEntrySheet(context, null, profile);
+                  }
+                });
+              },
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Record', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -73,18 +90,6 @@ class _BodyCompScreenState extends ConsumerState<BodyCompScreen>
           _buildHistoryTab(context, entries),
           _buildTrendsTab(context, entries),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          final profileAsync = ref.read(userProfileProvider);
-          profileAsync.whenData((profile) {
-            if (profile != null) {
-              _showAddEntrySheet(context, null, profile);
-            }
-          });
-        },
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('New Log'),
       ),
     );
   }

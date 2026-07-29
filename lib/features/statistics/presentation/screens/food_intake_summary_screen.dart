@@ -256,8 +256,17 @@ class _FoodIntakeSummaryScreenState extends ConsumerState<FoodIntakeSummaryScree
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Total Calories Consumed'),
-        centerTitle: true,
+        title: const Text('Calories Consumed'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.sm),
+            child: TextButton.icon(
+              onPressed: _showSearchFoodBottomSheet,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Food', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -548,11 +557,6 @@ class _FoodIntakeSummaryScreenState extends ConsumerState<FoodIntakeSummaryScree
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showSearchFoodBottomSheet,
-        icon: const Icon(Icons.search_rounded),
-        label: const Text('Search Food'),
       ),
     );
   }

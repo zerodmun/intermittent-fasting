@@ -13,6 +13,7 @@ import 'package:fast_flow/features/statistics/presentation/screens/monthly_calen
 import 'package:fast_flow/features/statistics/presentation/screens/average_fast_detail_screen.dart';
 import 'package:fast_flow/features/statistics/presentation/screens/exercise_screen.dart';
 import 'package:fast_flow/features/statistics/presentation/providers/statistics_provider.dart';
+import 'package:fast_flow/features/statistics/presentation/providers/workout_providers.dart';
 import 'package:fast_flow/shared/widgets/app_card.dart';
 import 'package:fast_flow/shared/widgets/stat_card.dart';
 import 'package:fast_flow/shared/widgets/section_header.dart';
@@ -26,6 +27,7 @@ class StatisticsScreen extends ConsumerWidget {
     final profileAsync = ref.watch(userProfileProvider);
     final foodLogs = ref.watch(foodLogsProvider);
     final records = ref.watch(fastingRecordsProvider);
+    final workoutStats = ref.watch(workoutStatsProvider);
     final theme = Theme.of(context);
 
     // Calculate Daily Calorie Requirement
@@ -166,6 +168,7 @@ class StatisticsScreen extends ConsumerWidget {
                 dailyCalories,
                 totalFoodCalories,
                 avgFastFormatted,
+                workoutStats,
                 theme,
               ),
               const SizedBox(height: AppSpacing.md),
@@ -220,6 +223,7 @@ class StatisticsScreen extends ConsumerWidget {
     int dailyCalories,
     int totalFoodCalories,
     String avgFastFormatted,
+    Map<String, dynamic> workoutStats,
     ThemeData theme,
   ) {
     return Padding(
@@ -292,7 +296,7 @@ class StatisticsScreen extends ConsumerWidget {
                   child: StatCard(
                     icon: Icons.fitness_center_rounded,
                     title: 'Exercises',
-                    value: '0 mins',
+                    value: '${workoutStats['totalDurationMinutes'] ?? 0} min',
                     iconColor: theme.colorScheme.tertiary,
                     onTap: () {
                       Navigator.push(

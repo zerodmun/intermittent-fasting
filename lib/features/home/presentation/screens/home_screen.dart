@@ -14,7 +14,6 @@ import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
 
 import 'package:fast_flow/features/home/presentation/widgets/home_header.dart';
 import 'package:fast_flow/features/home/presentation/widgets/fasting_progress_card.dart';
-import 'package:fast_flow/features/home/presentation/widgets/next_alarm_card.dart';
 import 'package:fast_flow/features/home/presentation/widgets/calories_card.dart';
 import 'package:fast_flow/features/home/presentation/widgets/completed_card.dart';
 
@@ -69,8 +68,6 @@ class HomeScreen extends ConsumerWidget {
                     HomeHeader(profile: profile),
                     const SizedBox(height: AppSpacing.sm),
                     FastingProgressCard(timerState: timerState),
-                    const SizedBox(height: AppSpacing.md),
-                    NextAlarmCard(timerState: timerState),
                     const SizedBox(height: AppSpacing.md),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),

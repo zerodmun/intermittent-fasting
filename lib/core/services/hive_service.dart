@@ -23,6 +23,7 @@ class HiveService {
   static const String _activeSessionBox = 'active_session';
   static const String _foodLogsBox = 'food_logs';
   static const String _foodSearchCacheBox = 'food_search_cache';
+  static const String _workoutLogsBox = 'workout_logs';
 
   late Box<UserProfile> userProfileBox;
   late Box<FastingSchedule> fastingScheduleBox;
@@ -32,6 +33,7 @@ class HiveService {
   late Box activeSessionBox;
   late Box foodLogsBox;
   late Box foodSearchCacheBox;
+  late Box workoutLogsBox;
 
   /// Initialize Hive and open all boxes safely
   Future<void> init() async {
@@ -58,6 +60,7 @@ class HiveService {
       _openBoxWithRecoveryAndFallback(_activeSessionBox),
       _openBoxWithRecoveryAndFallback(_foodLogsBox),
       _openBoxWithRecoveryAndFallback(_foodSearchCacheBox),
+      _openBoxWithRecoveryAndFallback(_workoutLogsBox),
     ]);
 
     userProfileBox = opened[0] as Box<UserProfile>;
@@ -68,6 +71,7 @@ class HiveService {
     activeSessionBox = opened[5];
     foodLogsBox = opened[6];
     foodSearchCacheBox = opened[7];
+    workoutLogsBox = opened[8];
   }
 
   void _registerAdapterSafe<T>(TypeAdapter<T> adapter) {
@@ -369,6 +373,25 @@ class HiveService {
     await foodLogsBox.delete(id);
   }
 
+  // ── Workout Logs ──
+
+  List<Map<String, dynamic>> get allWorkoutLogs {
+    try {
+      return workoutLogsBox.values.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (e) {
+      LoggerService.e('HiveService: Error reading workout logs', e);
+      return [];
+    }
+  }
+
+  Future<void> saveWorkoutLog(String id, Map<String, dynamic> entry) async {
+    await workoutLogsBox.put(id, entry);
+  }
+
+  Future<void> deleteWorkoutLog(String id) async {
+    await workoutLogsBox.delete(id);
+  }
+
   /// Clear all data
   Future<void> resetAll() async {
     await userProfileBox.clear();
@@ -379,5 +402,6 @@ class HiveService {
     await activeSessionBox.clear();
     await foodLogsBox.clear();
     await foodSearchCacheBox.clear();
+    await workoutLogsBox.clear();
   }
 }
