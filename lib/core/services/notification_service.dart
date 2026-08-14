@@ -4,6 +4,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:fast_flow/core/services/hive_service.dart';
+import 'package:fast_flow/core/services/fcm_service.dart';
+import 'package:fast_flow/core/services/notification_sync_service.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/fasting/data/services/fasting_engine.dart';
@@ -254,13 +256,61 @@ class NotificationService {
         );
       }
 
-      // Automatically reschedule on schedule changes
+      // Pre-create Android notification channels with explicit AudioAttributes for instant sound playback
+      final androidPlugin = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlugin != null) {
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'fasting_reminders_fast',
+            'Fasting Reminders (Fast Start)',
+            description: 'Fasting start notifications with fast sound',
+            importance: Importance.high,
+            playSound: true,
+            sound: RawResourceAndroidNotificationSound('fast'),
+            audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+          ),
+        );
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'fasting_reminders_eat',
+            'Fasting Reminders (Eat Time)',
+            description: 'Eating start notifications with eat sound',
+            importance: Importance.high,
+            playSound: true,
+            sound: RawResourceAndroidNotificationSound('eat'),
+            audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+          ),
+        );
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'fasting_reminders',
+            'Fasting Reminders',
+            description: 'Fasting reminder notifications',
+            importance: Importance.high,
+            playSound: true,
+          ),
+        );
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'fasting_reminders_silent',
+            'Fasting Reminders (Silent)',
+            description: 'Fasting reminder notifications without sound',
+            importance: Importance.high,
+            playSound: false,
+            enableVibration: false,
+          ),
+        );
+      }
+
+      // Automatically reschedule on schedule changes and sync to Firestore
       HiveService.instance.fastingScheduleBox.watch(key: 'schedule').listen((_) {
+        final currentSched = HiveService.instance.fastingSchedule;
+        NotificationSyncService.instance.updateSchedule(schedule: currentSched, incrementVersion: true);
         scheduleFastingNotifications();
         scheduleReminderNotifications('User Changes Today\'s Fasting Schedule');
       });
 
-      // Automatically reschedule on settings changes
+      // Automatically reschedule on settings changes and sync to Firestore
       HiveService.instance.settingsBox.watch().listen((event) {
         if (event.key == 'notifications_enabled' ||
             event.key == 'eating_notification_enabled' ||
@@ -273,6 +323,8 @@ class NotificationService {
             event.key == 'reminder_iftar_enabled' ||
             event.key == 'reminder_sound' ||
             event.key == 'reminder_vibration') {
+          final currentSched = HiveService.instance.fastingSchedule;
+          NotificationSyncService.instance.updateSchedule(schedule: currentSched, incrementVersion: true);
           scheduleReminderNotifications('Notification Preferences Change');
         }
       });
@@ -284,6 +336,16 @@ class NotificationService {
       });
 
       _initialized = true;
+
+      // Initialize FCM service for online push notifications
+      await FcmService.instance.init();
+
+      // Startup synchronization between local schedule version and Firestore remote schedule
+      await NotificationSyncService.instance.synchronizeOnStartup(
+        onRescheduleNeeded: (reason) async {
+          await scheduleReminderNotifications(reason);
+        },
+      );
 
       // Verify/Request notification permission status and log
       final enabled = HiveService.instance.getSetting<bool>('notifications_enabled') ?? true;
@@ -876,6 +938,81 @@ class NotificationService {
     }
   }
 
+/// Centralized sound resolver for Android notification details.
+AndroidNotificationSound? getFastingReminderSound({
+  required String soundName,
+}) {
+  switch (soundName) {
+    case 'eat':
+      return const RawResourceAndroidNotificationSound('eat');
+    case 'fast':
+      return const RawResourceAndroidNotificationSound('fast');
+    default:
+      return null;
+  }
+}
+
+  AndroidNotificationDetails _getAndroidDetailsForReminder({
+    required int reminderId,
+    required String soundPref,
+    required bool vibrationEnabled,
+  }) {
+    if (soundPref == 'silent') {
+      return const AndroidNotificationDetails(
+        'fasting_reminders_silent',
+        'Fasting Reminders (Silent)',
+        channelDescription: 'Fasting reminder notifications without sound',
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: false,
+        enableVibration: false,
+      );
+    }
+
+    if (soundPref == 'app_notification' || soundPref == 'bell' || soundPref == 'adhan') {
+      if (reminderId == _reminderFastingStartId) {
+        final customSound = getFastingReminderSound(soundName: 'fast');
+        return AndroidNotificationDetails(
+          'fasting_reminders_fast',
+          'Fasting Reminders (Fast Start)',
+          channelDescription: 'Fasting start notifications with fast sound',
+          importance: Importance.high,
+          priority: Priority.high,
+          playSound: true,
+          sound: customSound,
+          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+          enableVibration: vibrationEnabled,
+        );
+      }
+
+      if (reminderId == _reminderIftarTimeId) {
+        final customSound = getFastingReminderSound(soundName: 'eat');
+        return AndroidNotificationDetails(
+          'fasting_reminders_eat',
+          'Fasting Reminders (Eat Time)',
+          channelDescription: 'Eating start notifications with eat sound',
+          importance: Importance.high,
+          priority: Priority.high,
+          playSound: true,
+          sound: customSound,
+          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+          enableVibration: vibrationEnabled,
+        );
+      }
+    }
+
+    // Default / 10-minute reminders (no custom sound, system default sound)
+    return AndroidNotificationDetails(
+      'fasting_reminders',
+      'Fasting Reminders',
+      channelDescription: 'Fasting reminder notifications',
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: true,
+      enableVibration: vibrationEnabled,
+    );
+  }
+
   /// Schedules a single reminder notification with the configured sound and vibration.
   Future<void> _scheduleReminderNotification({
     required int id,
@@ -900,45 +1037,20 @@ class NotificationService {
       enableVibration: vibrationEnabled,
     );
 
-    AndroidNotificationDetails androidDetails;
-    bool usesCustomSound = false;
-
-    switch (soundPref) {
-      case 'app_notification':
-      case 'bell':
-      case 'adhan':
-        androidDetails = AndroidNotificationDetails(
-          'fasting_reminders_app',
-          'Fasting Reminders (App Notification)',
-          channelDescription: 'Fasting reminder notifications with app sound',
-          importance: Importance.high,
-          priority: Priority.high,
-          playSound: true,
-          sound: const RawResourceAndroidNotificationSound('bell'),
-          enableVibration: vibrationEnabled,
-        );
-        usesCustomSound = true;
-        break;
-      case 'silent':
-        androidDetails = AndroidNotificationDetails(
-          'fasting_reminders_silent',
-          'Fasting Reminders (Silent)',
-          channelDescription: 'Fasting reminder notifications without sound',
-          importance: Importance.high,
-          priority: Priority.high,
-          playSound: false,
-          enableVibration: vibrationEnabled,
-        );
-        break;
-      default:
-        androidDetails = defaultDetails();
-    }
+    final androidDetails = _getAndroidDetailsForReminder(
+      reminderId: id,
+      soundPref: soundPref,
+      vibrationEnabled: vibrationEnabled,
+    );
 
     final iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: soundPref != 'silent',
     );
+
+    final isCustomSoundChannel = androidDetails.channelId == 'fasting_reminders_fast' ||
+        androidDetails.channelId == 'fasting_reminders_eat';
 
     try {
       await _notifications.zonedSchedule(
@@ -951,12 +1063,12 @@ class NotificationService {
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       );
       if (kDebugMode) {
-        debugPrint('[NotificationService] Reminder scheduled: ID $id "$title" at $tzDate (sound: $soundPref)');
+        debugPrint('[NotificationService] Reminder scheduled: ID $id "$title" at $tzDate (sound: $soundPref, channel: ${androidDetails.channelId})');
       }
     } catch (e) {
-      if (usesCustomSound) {
+      if (isCustomSoundChannel) {
         if (kDebugMode) {
-          debugPrint('[NotificationService] Custom sound "$soundPref" failed, falling back to default: $e');
+          debugPrint('[NotificationService] Custom sound channel "${androidDetails.channelId}" failed, falling back to default system sound channel: $e');
         }
         try {
           await _notifications.zonedSchedule(
@@ -980,6 +1092,219 @@ class NotificationService {
         if (kDebugMode) {
           debugPrint('[NotificationService] Failed scheduling reminder ID $id: $e');
         }
+      }
+    }
+  }
+
+  /// Normalizes incoming event type strings to canonical event names:
+  /// - FASTING_START / FASTING_START_SOON
+  /// - FASTING_END / FASTING_END_SOON
+  String normalizeEventType(String rawType) {
+    switch (rawType.toLowerCase()) {
+      case 'fasting_reminder_start':
+      case 'fasting_start_reminder':
+        return 'FASTING_START_SOON';
+      case 'fasting_start':
+        return 'FASTING_START';
+      case 'fasting_reminder_end':
+      case 'fasting_end_reminder':
+        return 'FASTING_END_SOON';
+      case 'fasting_end':
+      case 'eating_start':
+        return 'FASTING_END';
+      default:
+        return rawType.toUpperCase();
+    }
+  }
+
+  /// Single unified entry-point for displaying reminder notifications,
+  /// used by both Local Alarms and FCM Event Triggers.
+  Future<void> processReminderEvent({
+    required String eventId,
+    required String eventType,
+    String? rawType,
+  }) async {
+    // 1. Check event deduplication
+    if (HiveService.instance.isEventProcessed(eventId)) {
+      if (kDebugMode) {
+        debugPrint('[Notification] Event $eventId already processed - skipping duplicate notification');
+      }
+      return;
+    }
+
+    String title;
+    String body;
+    int id;
+
+    final normalized = normalizeEventType(eventType);
+
+    switch (normalized) {
+      case 'FASTING_START_SOON':
+        title = 'Fasting Starts Soon';
+        body = 'Your fasting will begin in 10 minutes.';
+        id = _reminderFastingSoonId;
+        break;
+
+      case 'FASTING_START':
+        title = 'Fasting Started';
+        body = 'Your fasting has officially begun.';
+        id = _reminderFastingStartId;
+        if (kDebugMode) {
+          debugPrint('[Notification] Showing fasting start reminder');
+          debugPrint('[Notification] Sound: fast.mp3');
+        }
+        break;
+
+      case 'FASTING_END_SOON':
+        title = 'Iftar is Almost Here';
+        body = 'Only 10 minutes remaining until it\'s time to break your fast.';
+        id = _reminderIftarSoonId;
+        break;
+
+      case 'FASTING_END':
+        title = 'It\'s Time to Break Your Fast';
+        body = 'May your fasting be accepted. Enjoy your meal.';
+        id = _reminderIftarTimeId;
+        if (kDebugMode) {
+          debugPrint('[Notification] Showing fasting end reminder');
+          debugPrint('[Notification] Sound: eat.mp3');
+        }
+        break;
+
+      default:
+        title = 'Fasting Update';
+        body = 'Scheduled notification alert.';
+        id = 2099;
+    }
+
+    final soundPref = HiveService.instance.getSetting<String>('reminder_sound') ?? 'app_notification';
+    final vibrationEnabled = HiveService.instance.getSetting<bool>('reminder_vibration') ?? true;
+
+    AndroidNotificationDetails defaultDetails() => AndroidNotificationDetails(
+      'fasting_reminders',
+      'Fasting Reminders',
+      channelDescription: 'Fasting reminder notifications',
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: true,
+      enableVibration: vibrationEnabled,
+    );
+
+    final androidDetails = _getAndroidDetailsForReminder(
+      reminderId: id,
+      soundPref: soundPref,
+      vibrationEnabled: vibrationEnabled,
+    );
+
+    final iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: soundPref != 'silent',
+    );
+
+    final isCustomSoundChannel = androidDetails.channelId == 'fasting_reminders_fast' ||
+        androidDetails.channelId == 'fasting_reminders_eat';
+
+    final receivedTime = DateTime.now().toIso8601String();
+    if (kDebugMode) {
+      debugPrint('[Notification] Event received: $receivedTime');
+      debugPrint('[Notification] Calling show(): ${DateTime.now().toIso8601String()}');
+    }
+
+    try {
+      await _notifications.show(
+        id,
+        title,
+        body,
+        NotificationDetails(android: androidDetails, iOS: iosDetails),
+      );
+
+      if (kDebugMode) {
+        debugPrint('[Notification] show() completed: ${DateTime.now().toIso8601String()}');
+      }
+
+      // Mark event as processed to complete deduplication
+      await HiveService.instance.markEventProcessed(eventId);
+
+      if (kDebugMode) {
+        debugPrint('[Notification] Displayed notification for eventId: $eventId ($normalized, channel: ${androidDetails.channelId})');
+      }
+    } catch (e) {
+      if (isCustomSoundChannel) {
+        if (kDebugMode) {
+          debugPrint('[NotificationService] Custom sound display on channel ${androidDetails.channelId} failed, trying default system sound fallback: $e');
+        }
+        try {
+          await _notifications.show(
+            id,
+            title,
+            body,
+            NotificationDetails(android: defaultDetails(), iOS: iosDetails),
+          );
+          await HiveService.instance.markEventProcessed(eventId);
+        } catch (fallbackError) {
+          if (kDebugMode) {
+            debugPrint('[Notification] FAILED: notificationId: $id, channelId: ${defaultDetails().channelId}, error: $fallbackError');
+          }
+        }
+      } else {
+        if (kDebugMode) {
+          debugPrint('[Notification] FAILED');
+          debugPrint('notificationId: $id');
+          debugPrint('channelId: ${androidDetails.channelId}');
+          debugPrint('eventType: $eventType');
+          debugPrint('error: $e');
+        }
+      }
+    }
+  }
+
+  /// Displays an immediate notification triggered by an incoming FCM push event.
+  Future<void> displayRemoteNotification({
+    required String type,
+    required String eventId,
+  }) async {
+    final normalizedType = normalizeEventType(type);
+    await processReminderEvent(
+      eventId: eventId,
+      eventType: normalizedType,
+      rawType: type,
+    );
+  }
+
+  /// Triggers an immediate local test notification to verify local Android notification display.
+  Future<void> triggerTestNotification() async {
+    if (kDebugMode) {
+      debugPrint('[Notification Test] Triggering local test notification');
+    }
+
+    const androidDetails = AndroidNotificationDetails(
+      'fasting_reminders',
+      'Fasting Reminders',
+      channelDescription: 'Fasting reminder notifications',
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: true,
+    );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    try {
+      await _notifications.show(
+        9999,
+        'Test Reminder',
+        'This is a local notification test.',
+        const NotificationDetails(android: androidDetails, iOS: iosDetails),
+      );
+      if (kDebugMode) {
+        debugPrint('[Notification Test] Local notification request completed');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[Notification Test] FAILED: $e');
       }
     }
   }

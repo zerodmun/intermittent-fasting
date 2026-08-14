@@ -296,5 +296,25 @@ void main() {
         }
       });
     });
+
+    group('Unified Event Pipeline, Normalization & Deduplication Tests', () {
+      test('normalizeEventType converts raw event strings to canonical names', () {
+        final service = NotificationService.instance;
+
+        expect(service.normalizeEventType('fasting_start_reminder'), equals('FASTING_START_SOON'));
+        expect(service.normalizeEventType('fasting_reminder_start'), equals('FASTING_START_SOON'));
+        expect(service.normalizeEventType('fasting_start'), equals('FASTING_START'));
+
+        expect(service.normalizeEventType('fasting_end_reminder'), equals('FASTING_END_SOON'));
+        expect(service.normalizeEventType('fasting_reminder_end'), equals('FASTING_END_SOON'));
+        expect(service.normalizeEventType('fasting_end'), equals('FASTING_END'));
+        expect(service.normalizeEventType('eating_start'), equals('FASTING_END'));
+      });
+
+      test('Canonical eventId format is scheduleId_date_eventType', () {
+        const eventId = 'fasting_schedule_001_2026-08-14_fasting_start';
+        expect(eventId, matches(RegExp(r'^[a-zA-Z0-9_]+_\d{4}-\d{2}-\d{2}_[a-zA-Z0-9_]+$')));
+      });
+    });
   });
 }

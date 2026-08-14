@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'package:fast_flow/app.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
@@ -17,6 +18,13 @@ import 'package:fast_flow/core/services/logger_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase App safely if configured
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    LoggerService.w('main: Firebase initialization note (proceeding with local capabilities): $e');
+  }
 
   // Load environment variables safely
   try {

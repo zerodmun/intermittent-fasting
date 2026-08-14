@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1035529171431",
+    "project_id": "fast-flow-f3bae",
+    "storage_bucket": "fast-flow-f3bae.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1035529171431:android:dab8f96c7ded4a7a9d4d42",
+        "android_client_info": {
+          "package_name": "com.fastflow.fast_flow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzSw165IOY1_Le9vqAInG9zHD-0Ye7heE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -8,6 +8,8 @@ import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
 import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
+import 'package:fast_flow/core/services/notification_sync_service.dart';
+import 'package:fast_flow/core/services/fcm_service.dart';
 
 /// Centralized Hive database service
 class HiveService {
@@ -24,6 +26,8 @@ class HiveService {
   static const String _foodLogsBox = 'food_logs';
   static const String _foodSearchCacheBox = 'food_search_cache';
   static const String _workoutLogsBox = 'workout_logs';
+  static const String _notificationScheduleCacheBox = 'notification_schedule_cache';
+  static const String _processedEventsBox = 'processed_events';
 
   late Box<UserProfile> userProfileBox;
   late Box<FastingSchedule> fastingScheduleBox;
@@ -34,6 +38,8 @@ class HiveService {
   late Box foodLogsBox;
   late Box foodSearchCacheBox;
   late Box workoutLogsBox;
+  late Box notificationScheduleCacheBox;
+  late Box processedEventsBox;
 
   /// Initialize Hive and open all boxes safely
   Future<void> init() async {
@@ -61,6 +67,8 @@ class HiveService {
       _openBoxWithRecoveryAndFallback(_foodLogsBox),
       _openBoxWithRecoveryAndFallback(_foodSearchCacheBox),
       _openBoxWithRecoveryAndFallback(_workoutLogsBox),
+      _openBoxWithRecoveryAndFallback(_notificationScheduleCacheBox),
+      _openBoxWithRecoveryAndFallback(_processedEventsBox),
     ]);
 
     userProfileBox = opened[0] as Box<UserProfile>;
@@ -72,6 +80,8 @@ class HiveService {
     foodLogsBox = opened[6];
     foodSearchCacheBox = opened[7];
     workoutLogsBox = opened[8];
+    notificationScheduleCacheBox = opened[9];
+    processedEventsBox = opened[10];
   }
 
   void _registerAdapterSafe<T>(TypeAdapter<T> adapter) {
@@ -114,10 +124,27 @@ class HiveService {
 
   // ── User Profile ──
 
-  UserProfile? get userProfile => userProfileBox.get('profile');
+  UserProfile? get userProfile {
+    try {
+      return userProfileBox.get('profile');
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> saveUserProfile(UserProfile profile) async {
     await userProfileBox.put('profile', profile);
+
+    try {
+      final currentSched = fastingSchedule;
+      await NotificationSyncService.instance.updateSchedule(
+        schedule: currentSched,
+        incrementVersion: true,
+      );
+      await FcmService.instance.reRegisterToken();
+    } catch (e) {
+      LoggerService.w('HiveService: Error re-syncing identity after saving profile: $e');
+    }
   }
 
   // ── Fasting Schedule ──
@@ -130,6 +157,45 @@ class HiveService {
 
   Future<void> saveFastingSchedule(FastingSchedule schedule) async {
     await fastingScheduleBox.put('schedule', schedule);
+  }
+
+  // ── Notification Cache & Event History ──
+
+  Map<String, dynamic>? getLocalNotificationScheduleCache() {
+    final data = notificationScheduleCacheBox.get('current_schedule');
+    if (data == null) return null;
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<void> saveLocalNotificationScheduleCache(Map<String, dynamic> cache) async {
+    await notificationScheduleCacheBox.put('current_schedule', cache);
+  }
+
+  bool isEventProcessed(String eventId) {
+    return processedEventsBox.containsKey(eventId);
+  }
+
+  Future<void> markEventProcessed(String eventId) async {
+    await processedEventsBox.put(eventId, DateTime.now().toIso8601String());
+    await pruneProcessedEvents();
+  }
+
+  Future<void> pruneProcessedEvents() async {
+    if (processedEventsBox.length <= 100) return;
+    final now = DateTime.now();
+    final keysToRemove = <dynamic>[];
+    for (final key in processedEventsBox.keys) {
+      final val = processedEventsBox.get(key);
+      if (val is String) {
+        final date = DateTime.tryParse(val);
+        if (date != null && now.difference(date).inDays > 7) {
+          keysToRemove.add(key);
+        }
+      }
+    }
+    for (final key in keysToRemove) {
+      await processedEventsBox.delete(key);
+    }
   }
 
   // ── Fasting Records ──
@@ -184,10 +250,18 @@ class HiveService {
 
   // ── Settings ──
 
-  T? getSetting<T>(String key) => settingsBox.get(key) as T?;
+  T? getSetting<T>(String key) {
+    try {
+      return settingsBox.get(key) as T?;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> setSetting(String key, dynamic value) async {
-    await settingsBox.put(key, value);
+    try {
+      await settingsBox.put(key, value);
+    } catch (_) {}
   }
 
   // ── Export / Import ──

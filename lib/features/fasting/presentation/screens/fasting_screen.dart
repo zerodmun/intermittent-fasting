@@ -7,6 +7,7 @@ import 'package:fast_flow/core/constants/app_animations.dart';
 import 'package:fast_flow/core/extensions/context_extensions.dart';
 import 'package:fast_flow/core/extensions/duration_extensions.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
+import 'package:fast_flow/core/services/notification_sync_service.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_state.dart';
@@ -314,7 +315,7 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
               AppButton.text(
                 label: 'Copy Monday to All',
                 size: AppButtonSize.sm,
-                onPressed: () {
+                onPressed: () async {
                   final monday = schedule.getScheduleFor(1);
                   final updatedMap = Map<int, DailySchedule>.from(schedule.dailySchedules);
                   for (int i = 2; i <= 7; i++) {
@@ -325,9 +326,16 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
                       eatMin: monday.eatMin,
                     );
                   }
-                  HiveService.instance.saveFastingSchedule(schedule.copyWith(dailySchedules: updatedMap));
+                  final updatedSched = schedule.copyWith(dailySchedules: updatedMap);
+                  await HiveService.instance.saveFastingSchedule(updatedSched);
+                  await NotificationSyncService.instance.updateSchedule(
+                    schedule: updatedSched,
+                    incrementVersion: true,
+                  );
                   notifier.onScheduleChanged();
-                  context.showSnack('Routine updated: Monday copied to all days', isSuccess: true);
+                  if (mounted) {
+                    context.showSnack('Routine updated: Monday copied to all days', isSuccess: true);
+                  }
                 },
               ),
             ],
@@ -571,10 +579,13 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
       );
 
       await HiveService.instance.saveFastingSchedule(updatedSched);
+      await NotificationSyncService.instance.updateSchedule(
+        schedule: updatedSched,
+        incrementVersion: true,
+      );
       notifier.onScheduleChanged();
-      if (context.mounted) {
-        context.showSnack('Plan updated successfully', isSuccess: true);
-      }
+      if (!context.mounted) return;
+      context.showSnack('Plan updated successfully', isSuccess: true);
     }
   }
 
