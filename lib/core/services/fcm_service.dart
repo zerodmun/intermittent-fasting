@@ -6,9 +6,10 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:fast_flow/core/services/hive_service.dart';
-import 'package:fast_flow/core/services/logger_service.dart';
 import 'package:fast_flow/core/services/notification_service.dart';
 import 'package:fast_flow/core/services/notification_sync_service.dart';
+import 'package:fast_flow/core/services/logger_service.dart';
+import 'package:fast_flow/core/services/startup_diag.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/widgets.dart';
@@ -72,6 +73,8 @@ class FcmService {
 
   /// Initialize FCM messaging, device token registration, and message listeners
   Future<void> init() async {
+    // ignore: avoid_print
+    print('[FCM-DIAG] FcmService.init() STARTED');
     if (_initialized) return;
 
     try {
@@ -138,6 +141,7 @@ class FcmService {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
       _initialized = true;
+      StartupDiag.log('FCM initialized');
     } catch (e, stackTrace) {
       LoggerService.e('FcmService initialization error', e, stackTrace);
     }
@@ -161,11 +165,8 @@ class FcmService {
     final userId = NotificationSyncService.instance.userId;
     var deviceId = getOrCreateDeviceId();
 
-    if (kDebugMode) {
-      debugPrint('[FCM] Device ID: $deviceId');
-      debugPrint('[FCM] Token available: true');
-      debugPrint('[FCM] Registering device for user: $userId');
-    }
+    // ignore: avoid_print
+    print('[FCM-DIAG] Registering device: $deviceId');
 
     try {
       // Protection against duplicate device records with the same FCM token for this user
@@ -179,13 +180,28 @@ class FcmService {
 
       if (existingDevices.docs.isNotEmpty) {
         final existingDoc = existingDevices.docs.first;
-        if (existingDoc.id != deviceId) {
-          if (kDebugMode) {
-            debugPrint('[FCM] Existing device ID found for FCM token: ${existingDoc.id}. Reusing canonical record.');
-          }
-          deviceId = existingDoc.id;
-          HiveService.instance.setSetting('fcm_device_id', deviceId);
-          _memoryDeviceIdCache = deviceId;
+        final matchedId = existingDoc.id;
+        // ignore: avoid_print
+        print('[FCM-DIAG] Current FCM token matched existing device: $matchedId');
+        // ignore: avoid_print
+        print('[FCM-DIAG] Updating existing device: $matchedId');
+        deviceId = matchedId;
+        HiveService.instance.setSetting('fcm_device_id', deviceId);
+        _memoryDeviceIdCache = deviceId;
+      } else {
+        final docRef = _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('devices')
+            .doc(deviceId);
+        final docSnap = await docRef.get().timeout(const Duration(seconds: 5));
+
+        if (docSnap.exists) {
+          // ignore: avoid_print
+          print('[FCM-DIAG] Updating existing device: $deviceId');
+        } else {
+          // ignore: avoid_print
+          print('[FCM-DIAG] Creating new device: $deviceId');
         }
       }
 
@@ -251,29 +267,44 @@ class FcmService {
   String? _memoryDeviceIdCache;
 
   String getOrCreateDeviceId() {
+    // ignore: avoid_print
+    print('[FCM-DIAG] getOrCreateDeviceId() CALLED');
+
     if (_memoryDeviceIdCache != null && _memoryDeviceIdCache!.isNotEmpty) {
+      // ignore: avoid_print
+      print('[FCM-DIAG] Device ID source: fcm_device_id');
+      // ignore: avoid_print
+      print('[FCM-DIAG] Resolved Device ID: $_memoryDeviceIdCache');
       return _memoryDeviceIdCache!;
     }
 
+    String source;
     // 1. Check primary fcm_device_id key
     var deviceId = HiveService.instance.getSetting<String>('fcm_device_id');
     if (deviceId != null && deviceId.isNotEmpty) {
-      _memoryDeviceIdCache = deviceId;
-      return deviceId;
+      source = 'fcm_device_id';
+    } else {
+      // 2. Migration check: read legacy device_id key if present
+      final legacyId = HiveService.instance.getSetting<String>('device_id');
+      if (legacyId != null && legacyId.isNotEmpty) {
+        deviceId = legacyId;
+        HiveService.instance.setSetting('fcm_device_id', legacyId);
+        source = 'legacy device_id';
+      } else {
+        // 3. Fallback: generate a new device ID if neither key exists
+        deviceId = 'device_${DateTime.now().millisecondsSinceEpoch}';
+        HiveService.instance.setSetting('fcm_device_id', deviceId);
+        source = 'generated';
+      }
     }
 
-    // 2. Migration check: read legacy device_id key if present
-    final legacyId = HiveService.instance.getSetting<String>('device_id');
-    if (legacyId != null && legacyId.isNotEmpty) {
-      HiveService.instance.setSetting('fcm_device_id', legacyId);
-      _memoryDeviceIdCache = legacyId;
-      return legacyId;
-    }
-
-    // 3. Fallback: generate a new device ID if neither key exists
-    deviceId = 'device_${DateTime.now().millisecondsSinceEpoch}';
-    HiveService.instance.setSetting('fcm_device_id', deviceId);
     _memoryDeviceIdCache = deviceId;
+
+    // ignore: avoid_print
+    print('[FCM-DIAG] Device ID source: $source');
+    // ignore: avoid_print
+    print('[FCM-DIAG] Resolved Device ID: $deviceId');
+
     return deviceId;
   }
 

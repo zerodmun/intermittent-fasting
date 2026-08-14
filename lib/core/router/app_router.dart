@@ -8,7 +8,6 @@ import 'package:fast_flow/features/home/presentation/screens/home_screen.dart';
 import 'package:fast_flow/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:fast_flow/features/settings/presentation/screens/settings_screen.dart';
 import 'package:fast_flow/features/settings/presentation/screens/notification_settings_screen.dart';
-import 'package:fast_flow/features/settings/presentation/screens/widgets_notification_settings_screen.dart';
 import 'package:fast_flow/features/settings/presentation/screens/data_storage_screen.dart';
 import 'package:fast_flow/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:fast_flow/features/weight/presentation/screens/weight_screen.dart';
@@ -166,10 +165,6 @@ class AppRouter {
                   GoRoute(
                     path: 'notifications',
                     builder: (context, state) => const NotificationSettingsScreen(),
-                  ),
-                  GoRoute(
-                    path: 'widgets-notification',
-                    builder: (context, state) => const WidgetsNotificationSettingsScreen(),
                   ),
                   GoRoute(
                     path: 'data-storage',

@@ -10,6 +10,7 @@ import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart
 import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/fasting/data/services/fasting_engine.dart';
 import 'package:fast_flow/features/fasting/data/services/timeline_generator.dart';
+import 'package:fast_flow/core/services/startup_diag.dart';
 
 class ScheduledNotification {
   final int id;
@@ -210,13 +211,13 @@ class NotificationService {
     );
   }
 
-  Future<void> init() async {
+  bool _backgroundInitialized = false;
+
+  /// Lightweight local initialization before runApp()
+  Future<void> initLocal() async {
     if (_initialized) return;
     try {
       _configureLocalTimeZone();
-
-      // Ensure FastingEngine is initialized to handle state queries correctly
-      FastingEngine().initialize();
 
       // Attempt initialization with primary launcher_icon resource
       const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
@@ -256,29 +257,29 @@ class NotificationService {
         );
       }
 
-      // Pre-create Android notification channels with explicit AudioAttributes for instant sound playback
+      // Pre-create Android production notification channels with explicit AudioAttributes for instant sound playback
       final androidPlugin = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       if (androidPlugin != null) {
         await androidPlugin.createNotificationChannel(
           const AndroidNotificationChannel(
-            'fasting_reminders_fast',
+            'fasting_reminders_fast_v2',
             'Fasting Reminders (Fast Start)',
             description: 'Fasting start notifications with fast sound',
             importance: Importance.high,
             playSound: true,
             sound: RawResourceAndroidNotificationSound('fast'),
-            audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+            audioAttributesUsage: AudioAttributesUsage.notification,
           ),
         );
         await androidPlugin.createNotificationChannel(
           const AndroidNotificationChannel(
-            'fasting_reminders_eat',
+            'fasting_reminders_eat_v2',
             'Fasting Reminders (Eat Time)',
             description: 'Eating start notifications with eat sound',
             importance: Importance.high,
             playSound: true,
             sound: RawResourceAndroidNotificationSound('eat'),
-            audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+            audioAttributesUsage: AudioAttributesUsage.notification,
           ),
         );
         await androidPlugin.createNotificationChannel(
@@ -336,40 +337,63 @@ class NotificationService {
       });
 
       _initialized = true;
+      StartupDiag.log('NotificationService initialized');
+    } catch (e, stackTrace) {
+      assert(() {
+        debugPrint('NotificationService: Local initialization failure: $e\n$stackTrace');
+        return true;
+      }());
+    }
+  }
 
-      // Initialize FCM service for online push notifications
+  /// Non-blocking background initialization after initial UI frame rendering
+  Future<void> initBackgroundServices() async {
+    if (_backgroundInitialized) return;
+    _backgroundInitialized = true;
+
+    try {
+      // 1. Initialize FastingEngine
+      StartupDiag.log('FastingEngine background initialization START');
+      FastingEngine().initialize();
+      StartupDiag.log('FastingEngine background initialization END');
+
+      // 2. Initialize FCM service for online push notifications
+      StartupDiag.log('FCM background initialization START');
       await FcmService.instance.init();
+      StartupDiag.log('FCM background initialization END');
 
-      // Startup synchronization between local schedule version and Firestore remote schedule
+      // 3. Startup synchronization between local schedule version and Firestore remote schedule
+      StartupDiag.log('NotificationSync background initialization START');
       await NotificationSyncService.instance.synchronizeOnStartup(
         onRescheduleNeeded: (reason) async {
           await scheduleReminderNotifications(reason);
         },
       );
+      StartupDiag.log('NotificationSync background initialization END');
 
       // Verify/Request notification permission status and log
       final enabled = HiveService.instance.getSetting<bool>('notifications_enabled') ?? true;
       if (enabled) {
         await requestPermissions();
-      } else {
-        if (kDebugMode) {
-          debugPrint('[NotificationService] Permission status: disabled in settings');
-        }
       }
 
-      if (kDebugMode) {
-        debugPrint('[NotificationService] Notification service initialized');
-      }
-
-      // Schedule initially on startup
+      // 4. Background notification scheduling
+      StartupDiag.log('Notification scheduling background START');
       await scheduleFastingNotifications();
       await scheduleReminderNotifications('Application Startup');
+      StartupDiag.log('Notification scheduling background END');
     } catch (e, stackTrace) {
       assert(() {
-        debugPrint('NotificationService: Critical initialization failure: $e\n$stackTrace');
+        debugPrint('NotificationService: Background initialization error: $e\n$stackTrace');
         return true;
       }());
     }
+  }
+
+  /// Full initialization helper (backwards compatibility for tests)
+  Future<void> init() async {
+    await initLocal();
+    await initBackgroundServices();
   }
 
   void _configureLocalTimeZone() {
@@ -704,6 +728,7 @@ class NotificationService {
     int failedCount = 0;
 
     try {
+      StartupDiag.log('Notification scheduling started');
       if (kDebugMode) {
         debugPrint('[NotificationService] Notification scheduling triggered.');
         debugPrint('  • Trigger Source: $triggerSource');
@@ -934,6 +959,7 @@ class NotificationService {
         );
       }
     } finally {
+      StartupDiag.log('Notification scheduling completed');
       _isSchedulingReminders = false;
     }
   }
@@ -969,39 +995,39 @@ AndroidNotificationSound? getFastingReminderSound({
       );
     }
 
-    if (soundPref == 'app_notification' || soundPref == 'bell' || soundPref == 'adhan') {
-      if (reminderId == _reminderFastingStartId) {
-        final customSound = getFastingReminderSound(soundName: 'fast');
-        return AndroidNotificationDetails(
-          'fasting_reminders_fast',
-          'Fasting Reminders (Fast Start)',
-          channelDescription: 'Fasting start notifications with fast sound',
-          importance: Importance.high,
-          priority: Priority.high,
-          playSound: true,
-          sound: customSound,
-          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
-          enableVibration: vibrationEnabled,
-        );
-      }
-
-      if (reminderId == _reminderIftarTimeId) {
-        final customSound = getFastingReminderSound(soundName: 'eat');
-        return AndroidNotificationDetails(
-          'fasting_reminders_eat',
-          'Fasting Reminders (Eat Time)',
-          channelDescription: 'Eating start notifications with eat sound',
-          importance: Importance.high,
-          priority: Priority.high,
-          playSound: true,
-          sound: customSound,
-          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
-          enableVibration: vibrationEnabled,
-        );
-      }
+    // 1. FASTING_START (ID 2001) -> fasting_reminders_fast_v2 with fast.mp3
+    if (reminderId == _reminderFastingStartId) {
+      final customSound = getFastingReminderSound(soundName: 'fast');
+      return AndroidNotificationDetails(
+        'fasting_reminders_fast_v2',
+        'Fasting Reminders (Fast Start)',
+        channelDescription: 'Fasting start notifications with fast sound',
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: true,
+        sound: customSound,
+        audioAttributesUsage: AudioAttributesUsage.notification,
+        enableVibration: vibrationEnabled,
+      );
     }
 
-    // Default / 10-minute reminders (no custom sound, system default sound)
+    // 2. FASTING_END / IFTAR_TIME (ID 2003) -> fasting_reminders_eat_v2 with eat.mp3
+    if (reminderId == _reminderIftarTimeId) {
+      final customSound = getFastingReminderSound(soundName: 'eat');
+      return AndroidNotificationDetails(
+        'fasting_reminders_eat_v2',
+        'Fasting Reminders (Eat Time)',
+        channelDescription: 'Eating start notifications with eat sound',
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: true,
+        sound: customSound,
+        audioAttributesUsage: AudioAttributesUsage.notification,
+        enableVibration: vibrationEnabled,
+      );
+    }
+
+    // 3. FASTING_START_SOON (ID 2000) & FASTING_END_SOON (ID 2002) / 10-minute reminders -> fasting_reminders (system default sound)
     return AndroidNotificationDetails(
       'fasting_reminders',
       'Fasting Reminders',
@@ -1049,8 +1075,54 @@ AndroidNotificationSound? getFastingReminderSound({
       presentSound: soundPref != 'silent',
     );
 
-    final isCustomSoundChannel = androidDetails.channelId == 'fasting_reminders_fast' ||
-        androidDetails.channelId == 'fasting_reminders_eat';
+    final soundName = androidDetails.channelId == 'fasting_reminders_fast_v2'
+        ? 'fast'
+        : (androidDetails.channelId == 'fasting_reminders_eat_v2' ? 'eat' : 'default_system');
+
+    String eventTypeStr = 'UNKNOWN';
+    if (id == _reminderFastingSoonId) {
+      eventTypeStr = 'FASTING_START_SOON';
+    } else if (id == _reminderFastingStartId) {
+      eventTypeStr = 'FASTING_START';
+    } else if (id == _reminderIftarSoonId) {
+      eventTypeStr = 'FASTING_END_SOON';
+    } else if (id == _reminderIftarTimeId) {
+      eventTypeStr = 'FASTING_END';
+    }
+
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] Scheduling notification');
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] eventType: $eventTypeStr');
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] notificationId: $id');
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] channelId: ${androidDetails.channelId}');
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] sound: $soundName');
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] playSound: ${androidDetails.playSound}');
+
+    final nowTs = DateTime.now().toIso8601String();
+    // ignore: avoid_print
+    print('[SOUND-TIMING] BEFORE_NOTIFICATION_CALL');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] eventType: $eventTypeStr');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] notificationId: $id');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] channelId: ${androidDetails.channelId}');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] sound: $soundName');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] playSound: ${androidDetails.playSound}');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] scheduledFor: ${scheduledDate.toIso8601String()}');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] timestamp: $nowTs');
+
+    final isCustomSoundChannel = androidDetails.channelId == 'fasting_reminders_fast_v2' ||
+        androidDetails.channelId == 'fasting_reminders_eat_v2';
 
     try {
       await _notifications.zonedSchedule(
@@ -1202,8 +1274,45 @@ AndroidNotificationSound? getFastingReminderSound({
       presentSound: soundPref != 'silent',
     );
 
-    final isCustomSoundChannel = androidDetails.channelId == 'fasting_reminders_fast' ||
-        androidDetails.channelId == 'fasting_reminders_eat';
+    final soundName = androidDetails.channelId == 'fasting_reminders_fast_v2'
+        ? 'fast'
+        : (androidDetails.channelId == 'fasting_reminders_eat_v2' ? 'eat' : 'default_system');
+
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] Displaying FCM trigger notification');
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] eventType: $normalized');
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] notificationId: $id');
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] eventId: $eventId');
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] channelId: ${androidDetails.channelId}');
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] sound: $soundName');
+    // ignore: avoid_print
+    print('[SOUND-VERIFY] playSound: ${androidDetails.playSound}');
+
+    final nowTs = DateTime.now().toIso8601String();
+    // ignore: avoid_print
+    print('[SOUND-TIMING] BEFORE_NOTIFICATION_SHOW');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] eventType: $normalized');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] notificationId: $id');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] eventId: $eventId');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] channelId: ${androidDetails.channelId}');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] sound: $soundName');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] playSound: ${androidDetails.playSound}');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] timestamp: $nowTs');
+
+    final isCustomSoundChannel = androidDetails.channelId == 'fasting_reminders_fast_v2' ||
+        androidDetails.channelId == 'fasting_reminders_eat_v2';
 
     final receivedTime = DateTime.now().toIso8601String();
     if (kDebugMode) {
@@ -1218,6 +1327,20 @@ AndroidNotificationSound? getFastingReminderSound({
         body,
         NotificationDetails(android: androidDetails, iOS: iosDetails),
       );
+
+      final afterShowTs = DateTime.now().toIso8601String();
+      // ignore: avoid_print
+      print('[SOUND-TIMING] AFTER_SHOW');
+      // ignore: avoid_print
+      print('[SOUND-TIMING] eventType: $normalized');
+      // ignore: avoid_print
+      print('[SOUND-TIMING] notificationId: $id');
+      // ignore: avoid_print
+      print('[SOUND-TIMING] eventId: $eventId');
+      // ignore: avoid_print
+      print('[SOUND-TIMING] channelId: ${androidDetails.channelId}');
+      // ignore: avoid_print
+      print('[SOUND-TIMING] timestamp: $afterShowTs');
 
       if (kDebugMode) {
         debugPrint('[Notification] show() completed: ${DateTime.now().toIso8601String()}');
@@ -1307,5 +1430,69 @@ AndroidNotificationSound? getFastingReminderSound({
         debugPrint('[Notification Test] FAILED: $e');
       }
     }
+  }
+
+  /// Temporary diagnostic helper for direct show() timing comparison
+  Future<void> debugTestDirectShow({bool useCustomSound = true}) async {
+    final int testId = useCustomSound ? _reminderFastingStartId : _reminderFastingSoonId;
+    final String soundName = useCustomSound ? 'fast' : 'default_system';
+
+    final androidDetails = _getAndroidDetailsForReminder(
+      reminderId: testId,
+      soundPref: 'app_notification',
+      vibrationEnabled: true,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    final String t0 = DateTime.now().toIso8601String();
+    // ignore: avoid_print
+    print('[SOUND-TIMING] BEFORE_SHOW');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] eventType: ${useCustomSound ? "FASTING_START" : "FASTING_START_SOON"}');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] notificationId: $testId');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] channelId: ${androidDetails.channelId}');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] sound: $soundName');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] playSound: ${androidDetails.playSound}');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] timestamp: $t0');
+
+    await _notifications.show(
+      testId,
+      useCustomSound ? 'Fasting Started Test' : 'Fasting Soon Test',
+      useCustomSound ? 'Direct show test with fast.mp3' : 'Direct show test with system sound',
+      NotificationDetails(android: androidDetails, iOS: iosDetails),
+    );
+
+    final String t1 = DateTime.now().toIso8601String();
+    // ignore: avoid_print
+    print('[SOUND-TIMING] AFTER_SHOW');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] eventType: ${useCustomSound ? "FASTING_START" : "FASTING_START_SOON"}');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] notificationId: $testId');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] channelId: ${androidDetails.channelId}');
+    // ignore: avoid_print
+    print('[SOUND-TIMING] timestamp: $t1');
+
+    // ignore: avoid_print
+    print('[SOUND-LOCK-DIAG] AFTER_SHOW');
+    // ignore: avoid_print
+    print('[SOUND-LOCK-DIAG] eventType: ${useCustomSound ? "FASTING_START" : "FASTING_START_SOON"}');
+    // ignore: avoid_print
+    print('[SOUND-LOCK-DIAG] notificationId: $testId');
+    // ignore: avoid_print
+    print('[SOUND-LOCK-DIAG] channelId: ${androidDetails.channelId}');
+    // ignore: avoid_print
+    print('[SOUND-LOCK-DIAG] timestamp: $t1');
   }
 }

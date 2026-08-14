@@ -5,8 +5,8 @@ import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_state.dart';
-import 'package:fast_flow/core/services/widget_sync_service.dart';
 import 'package:fast_flow/core/services/logger_service.dart';
+import 'package:fast_flow/core/services/startup_diag.dart';
 
 import 'timeline_generator.dart';
 import 'session_resolver.dart';
@@ -49,6 +49,7 @@ class FastingEngine {
     _tick();
     _startTimer();
     _autoGenerateHistory();
+    StartupDiag.log('FastingEngine initialized');
 
     // Reactively watch schedule updates to clear cache and recalculate active sessions
     HiveService.instance.fastingScheduleBox.watch(key: 'schedule').listen((_) {
@@ -108,7 +109,6 @@ class FastingEngine {
     }
 
     _notifyListeners();
-    WidgetSyncService.instance.syncToNative();
   }
 
   void _ensureTimeline() {

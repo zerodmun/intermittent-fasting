@@ -1,6 +1,4 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
@@ -38,27 +36,6 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- Foreground Service for Ongoing Live Countdown Notification -->
-        <service
-            android:name=".FastingForegroundService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="fasting_countdown" />
-        </service>
-
-        <!-- Notification Dismiss/Action Handler -->
-        <receiver
-            android:name=".NotificationActionReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="ACTION_DISMISS" />
-            </intent-filter>
-        </receiver>
-
         <!-- flutter_local_notifications Scheduled Notification Receivers for Boot & Package Upgrade Recovery -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
@@ -71,42 +48,6 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
-        </receiver>
-
-        <!-- Small Widget Provider -->
-        <receiver android:name=".FastingWidgetProviderSmall"
-            android:label="Fomo IF Status (2x2)"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/fasting_widget_info_small" />
-        </receiver>
-
-        <!-- Medium Widget Provider -->
-        <receiver android:name=".FastingWidgetProviderMedium"
-            android:label="Fomo IF Progress (4x2)"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/fasting_widget_info_medium" />
-        </receiver>
-
-        <!-- Large Widget Provider -->
-        <receiver android:name=".FastingWidgetProviderLarge"
-            android:label="Fomo IF Dashboard (4x4)"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/fasting_widget_info_large" />
         </receiver>
     </application>
     <!-- Required to query activities that can process text, see:

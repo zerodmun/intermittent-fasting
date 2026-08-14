@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
-import 'package:fast_flow/core/services/widget_sync_service.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
 
 class OnboardingState {
@@ -127,7 +126,6 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
 
     await HiveService.instance.saveUserProfile(profile);
     await HiveService.instance.saveFastingSchedule(schedule);
-    await WidgetSyncService.instance.syncToNative();
   }
 }
 

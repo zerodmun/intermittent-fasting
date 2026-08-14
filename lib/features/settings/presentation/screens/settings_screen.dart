@@ -81,21 +81,6 @@ class SettingsScreen extends ConsumerWidget {
                   trailing: Icon(Icons.chevron_right_rounded, color: colorScheme.primary),
                   onTap: () => context.go('/settings/notifications'),
                 ),
-                const Divider(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.widgets_rounded, color: colorScheme.primary),
-                  title: Text(
-                    'Widgets & Persistent Notification',
-                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    'Home screen widgets, persistent status & timer options.',
-                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                  ),
-                  trailing: Icon(Icons.chevron_right_rounded, color: colorScheme.primary),
-                  onTap: () => context.go('/settings/widgets-notification'),
-                ),
               ],
             ),
           ),

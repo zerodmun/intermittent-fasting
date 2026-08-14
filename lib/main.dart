@@ -12,21 +12,22 @@ import 'package:fast_flow/app.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
 import 'package:fast_flow/core/services/notification_service.dart';
-import 'package:fast_flow/core/services/widget_sync_service.dart';
-
+import 'package:fast_flow/core/services/startup_diag.dart';
 import 'package:fast_flow/core/services/logger_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  StartupDiag.start();
 
   // Initialize Firebase App safely if configured
   try {
     await Firebase.initializeApp();
+    StartupDiag.log('Firebase initialized');
   } catch (e) {
-    LoggerService.w('main: Firebase initialization note (proceeding with local capabilities): $e');
+    LoggerService.w('main: Firebase initializeApp skipped or failed: $e');
   }
 
-  // Load environment variables safely
+  // Load environment variables (.env) safely
   try {
     await dotenv.load(fileName: '.env');
   } catch (e) {
@@ -42,16 +43,11 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Initialize services safely and concurrently with a timeout to ensure Splash Screen never hangs
+  // Fast local storage & local notification plugin initialization
   try {
     await HiveService.instance.init();
-    await Future.wait([
-      NotificationService.instance.init(),
-      WidgetSyncService.instance.initialize(),
-    ]).timeout(const Duration(seconds: 4), onTimeout: () {
-      LoggerService.w('main: Service initialization timed out after 4 seconds. Proceeding to startup...');
-      return [];
-    });
+    StartupDiag.log('Hive initialized');
+    await NotificationService.instance.initLocal();
   } catch (e, stackTrace) {
     LoggerService.e('main: Service initialization failed', e, stackTrace);
   }
@@ -66,6 +62,13 @@ Future<void> main() async {
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
   }
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    StartupDiag.log('First Flutter frame');
+    NotificationService.instance.initBackgroundServices();
+  });
+
+  StartupDiag.log('runApp START');
 
   runApp(
     ProviderScope(

@@ -7,6 +7,7 @@ import 'package:fast_flow/core/providers/app_providers.dart';
 import 'package:fast_flow/core/constants/app_spacing.dart';
 import 'package:fast_flow/core/extensions/context_extensions.dart';
 import 'package:fast_flow/core/extensions/duration_extensions.dart';
+import 'package:fast_flow/core/services/startup_diag.dart';
 import 'package:fast_flow/features/fasting/presentation/providers/fasting_providers.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
@@ -29,6 +30,10 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      StartupDiag.logMainScreenReady();
+    });
+
     final profileAsync = ref.watch(userProfileProvider);
     final timerState = ref.watch(fastingStateNotifierProvider);
     final streak = ref.watch(streakProvider);

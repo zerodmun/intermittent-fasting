@@ -3,7 +3,6 @@ import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
 import 'package:fast_flow/features/weight/domain/entities/body_comp_result.dart';
 import 'package:fast_flow/features/weight/data/services/body_comp_calculator.dart';
-import 'package:fast_flow/core/services/widget_sync_service.dart';
 
 class WeightNotifier extends Notifier<List<WeightEntry>> {
   @override
@@ -14,19 +13,16 @@ class WeightNotifier extends Notifier<List<WeightEntry>> {
   Future<void> addEntry(WeightEntry entry) async {
     await HiveService.instance.saveWeightEntry(entry);
     state = HiveService.instance.allWeightEntries;
-    WidgetSyncService.instance.syncToNative();
   }
 
   Future<void> updateEntry(WeightEntry entry) async {
     await HiveService.instance.saveWeightEntry(entry);
     state = HiveService.instance.allWeightEntries;
-    WidgetSyncService.instance.syncToNative();
   }
 
   Future<void> deleteEntry(String id) async {
     await HiveService.instance.deleteWeightEntry(id);
     state = HiveService.instance.allWeightEntries;
-    WidgetSyncService.instance.syncToNative();
   }
 }
 
