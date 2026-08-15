@@ -1294,6 +1294,22 @@ AndroidNotificationSound? getFastingReminderSound({
     print('[SOUND-VERIFY] playSound: ${androidDetails.playSound}');
 
     final nowTs = DateTime.now().toIso8601String();
+    const isRelease = kReleaseMode;
+    // ignore: avoid_print
+    print('[SOUND-RELEASE-VERIFY]');
+    // ignore: avoid_print
+    print('eventType: $normalized');
+    // ignore: avoid_print
+    print('notificationId: $id');
+    // ignore: avoid_print
+    print('channelId: ${androidDetails.channelId}');
+    // ignore: avoid_print
+    print('soundResource: $soundName');
+    // ignore: avoid_print
+    print('playSound: ${androidDetails.playSound}');
+    // ignore: avoid_print
+    print('isRelease: $isRelease');
+
     // ignore: avoid_print
     print('[SOUND-TIMING] BEFORE_NOTIFICATION_SHOW');
     // ignore: avoid_print

@@ -11,3 +11,9 @@
 ## Flutter Local Notifications plugin rules
 -keep class com.dexterous.flutterlocalnotifications.** { *; }
 -keepclassmembers class com.dexterous.flutterlocalnotifications.** { *; }
+
+## Keep raw audio resources from R8 resource shrinking/stripping
+-keepclassmembers class **.R$raw {
+    public static <fields>;
+}
+-keep class **.R$raw { *; }

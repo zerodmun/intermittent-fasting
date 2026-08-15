@@ -48,7 +48,6 @@ flutter:
     - assets/illustrations/
     - assets/branding/
     - assets/google_fonts/
-    - .env
 
 flutter_launcher_icons:
   android: "launcher_icon"
