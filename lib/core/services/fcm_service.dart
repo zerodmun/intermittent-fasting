@@ -266,6 +266,12 @@ class FcmService {
 
   String? _memoryDeviceIdCache;
 
+  @visibleForTesting
+  void resetMemoryCache() {
+    _memoryDeviceIdCache = null;
+  }
+
+
   String getOrCreateDeviceId() {
     // ignore: avoid_print
     print('[FCM-DIAG] getOrCreateDeviceId() CALLED');
@@ -349,7 +355,17 @@ class FcmService {
       debugPrint('[FCM] Checking event deduplication');
     }
 
-    // Validation 1: Check master notifications setting
+    // Validation 1: Check active user UID ownership (prevent cross-account notification triggers on account switch)
+    final payloadUid = data['uid'] as String? ?? data['userId'] as String?;
+    final activeUid = HiveService.instance.currentActiveUserId;
+    if (payloadUid != null && payloadUid.isNotEmpty && payloadUid != activeUid) {
+      if (kDebugMode) {
+        debugPrint('[FcmService] Ignored FCM event $eventId: Payload UID ($payloadUid) does not match active UID ($activeUid)');
+      }
+      return;
+    }
+
+    // Validation 2: Check master notifications setting
     final enabled = HiveService.instance.getSetting<bool>('notifications_enabled') ?? true;
     if (!enabled) {
       if (kDebugMode) {
@@ -358,7 +374,7 @@ class FcmService {
       return;
     }
 
-    // Validation 2: Check schedule versioning (stale task protection)
+    // Validation 3: Check schedule versioning (stale task protection)
     final incomingVersion = int.tryParse(versionStr) ?? 0;
     final localVersion = NotificationSyncService.instance.localVersion;
     if (incomingVersion < localVersion) {
@@ -368,13 +384,14 @@ class FcmService {
       return;
     }
 
-    // Validation 3: Event deduplication check
+    // Validation 4: Event deduplication check
     if (HiveService.instance.isEventProcessed(eventId)) {
       if (kDebugMode) {
         debugPrint('[FCM] Event already processed - skipping');
       }
       return;
     }
+
 
     if (kDebugMode) {
       debugPrint('[FCM] New reminder event');

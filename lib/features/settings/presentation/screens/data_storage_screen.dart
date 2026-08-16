@@ -32,7 +32,7 @@ class DataStorageScreen extends StatelessWidget {
           AppCard.elevated(
             child: Column(
               children: [
-                // 1. Export Backup
+                // 1. Export Backup (Normal export does not require warning dialog)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(Icons.upload_file_rounded, color: colorScheme.primary),
@@ -41,35 +41,26 @@ class DataStorageScreen extends StatelessWidget {
                     style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Text(
-                    'Export all profile, weight, and logs to JSON.',
+                    'Export profile, fasting records, and weight data to JSON.',
                     style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                   ),
                   onTap: () async {
-                    final confirm = await AppDialog.showConfirm(
-                      context: context,
-                      title: 'Export Backup Data',
-                      content: 'Are you sure you want to export your profile, fasting records, and weight data to a JSON backup file?',
-                      confirmLabel: 'Export',
-                      cancelLabel: 'Cancel',
-                    );
-                    if (confirm == true) {
-                      final path = await HiveService.instance.exportData();
-                      if (context.mounted) {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AppDialog(
-                            title: 'Data Exported',
-                            content: 'Backup file exported successfully to:\n\n$path',
-                            confirmLabel: 'OK',
-                            onConfirm: () => Navigator.pop(context),
-                          ),
-                        );
-                      }
+                    final path = await HiveService.instance.exportData();
+                    if (context.mounted) {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AppDialog(
+                          title: 'Data Exported',
+                          content: 'Backup file exported successfully to:\n\n$path',
+                          confirmLabel: 'OK',
+                          onConfirm: () => Navigator.pop(context),
+                        ),
+                      );
                     }
                   },
                 ),
                 const Divider(),
-                // 2. Restore Backup
+                // 2. Restore Backup (Requires warning confirmation dialog)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(Icons.settings_backup_restore_rounded, color: colorScheme.primary),
@@ -84,10 +75,10 @@ class DataStorageScreen extends StatelessWidget {
                   onTap: () async {
                     final confirm = await AppDialog.showConfirm(
                       context: context,
-                      title: 'Restore Backup Data',
-                      content: 'Are you sure you want to restore your data from backup? This will overwrite your current profile, fasting records, and weight data.',
+                      title: 'Restore backup?',
+                      content: 'Restoring this backup may replace your current data. Make sure you have a recent backup of your current data before continuing.',
                       confirmLabel: 'Restore',
-                      cancelLabel: 'Cancel',
+                      cancelLabel: 'CANCEL',
                     );
                     if (confirm == true) {
                       final dir = await getApplicationDocumentsDirectory();
@@ -146,10 +137,10 @@ class DataStorageScreen extends StatelessWidget {
               onTap: () async {
                 final confirm = await AppDialog.showConfirm(
                   context: context,
-                  title: 'Reset All Data',
-                  content: 'Warning: This action cannot be undone. All your profile settings, fasting records, workout logs, and weight data will be permanently deleted.',
-                  confirmLabel: 'Reset Everything',
-                  cancelLabel: 'Cancel',
+                  title: 'Delete all data?',
+                  content: 'This will permanently delete all locally stored application data, including your history, records, schedules, and settings. This action cannot be undone.',
+                  confirmLabel: 'DELETE ALL',
+                  cancelLabel: 'CANCEL',
                   isDestructive: true,
                 );
                 if (confirm == true) {

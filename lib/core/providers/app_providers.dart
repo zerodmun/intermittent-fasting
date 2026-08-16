@@ -7,6 +7,9 @@ import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/fasting/domain/entities/fasting_schedule.dart';
 import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fast_flow/core/services/auth_service.dart';
+
 
 class CurrentDateNotifier extends Notifier<DateTime> {
   @override
@@ -78,4 +81,8 @@ final streakProvider = Provider<StreakResult>((ref) {
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('Must be overridden in ProviderScope');
+});
+
+final authStateProvider = StreamProvider<User?>((ref) {
+  return AuthService.instance.authStateChanges;
 });

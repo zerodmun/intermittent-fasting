@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -18,6 +19,14 @@ class NotificationSyncService {
   FirebaseFirestore get _firestore => _customFirestore ?? FirebaseFirestore.instance;
 
   String get userId {
+    try {
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null && firebaseUser.uid.isNotEmpty) {
+        return firebaseUser.uid;
+      }
+    } catch (_) {
+      // Firebase instance not initialized in unit tests or offline fallback
+    }
     final profile = HiveService.instance.userProfile;
     if (profile != null && profile.name.trim().isNotEmpty) {
       return 'user_${profile.name.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';

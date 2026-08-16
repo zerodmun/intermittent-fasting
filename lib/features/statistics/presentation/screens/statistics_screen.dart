@@ -21,6 +21,16 @@ import 'package:fast_flow/shared/widgets/section_header.dart';
 class StatisticsScreen extends ConsumerWidget {
   const StatisticsScreen({super.key});
 
+  String _formatDuration(Duration d) {
+    if (d == Duration.zero) return '0h';
+    final hours = d.inHours;
+    final minutes = d.inMinutes % 60;
+    if (minutes == 0) {
+      return '${hours}h';
+    }
+    return '${hours}h ${minutes}m';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(statisticsProvider);
@@ -36,7 +46,7 @@ class StatisticsScreen extends ConsumerWidget {
       orElse: () => null,
     );
 
-    int dailyCalories = 2000; // default fallback
+    int dailyCalories = 2000;
     if (profile != null) {
       final isMale = profile.gender.toLowerCase() == 'male';
       final bmr = isMale
@@ -71,33 +81,17 @@ class StatisticsScreen extends ConsumerWidget {
       dailyCalories = (tdee + adjustment).clamp(1200.0, 5000.0).round();
     }
 
-    // Calculate Total Calories Consumed
     final totalFoodCalories = foodLogs.fold<double>(0.0, (sum, log) => sum + log.calories).round();
 
-    // Calculate Average Fasting Parameters
+    // Calculate Total Fasting Parameters for overall summary card
     final completedRecords = records.where((r) => r.status == 'completed').toList();
-    final totalCompleted = completedRecords.length;
     Duration totalFastingDuration = Duration.zero;
     for (final r in completedRecords) {
       totalFastingDuration += r.actualDuration;
     }
-    final avgFastingDuration = totalCompleted > 0
-        ? Duration(minutes: (totalFastingDuration.inMinutes / totalCompleted).round())
-        : Duration.zero;
+    final totalFastFormatted = _formatDuration(totalFastingDuration);
 
-    String formatDuration(Duration d) {
-      if (d == Duration.zero) return '-';
-      final hours = d.inHours;
-      final minutes = d.inMinutes % 60;
-      if (minutes == 0) {
-        return '${hours}h';
-      }
-      return '${hours}h ${minutes}m';
-    }
-
-    final avgFastFormatted = formatDuration(avgFastingDuration);
-
-    // Calculate Weekly Completion count and rate using real records
+    // Calculate Weekly Completion count
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
@@ -115,7 +109,7 @@ class StatisticsScreen extends ConsumerWidget {
     }
     final weeklyCompletionPercent = ((weeklyCompletedCount / 7) * 100).round();
 
-    // Calculate Monthly Trend grouped by week
+    // Calculate Monthly Trend
     final List<DateTime> mondaysOfCurrentMonth = [];
     final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
     for (int d = 1; d <= lastDayOfMonth.day; d++) {
@@ -162,12 +156,13 @@ class StatisticsScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: AppSpacing.md),
+              // Compact 4-Card Overview Grid
               _buildStatsGrid(
                 context,
                 stats,
                 dailyCalories,
                 totalFoodCalories,
-                avgFastFormatted,
+                totalFastFormatted,
                 workoutStats,
                 theme,
               ),
@@ -222,7 +217,7 @@ class StatisticsScreen extends ConsumerWidget {
     StatsData stats,
     int dailyCalories,
     int totalFoodCalories,
-    String avgFastFormatted,
+    String totalFastFormatted,
     Map<String, dynamic> workoutStats,
     ThemeData theme,
   ) {
@@ -230,6 +225,7 @@ class StatisticsScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
       child: Column(
         children: [
+          // Row 1: Daily Calories & Total Calories Consumed
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -271,6 +267,7 @@ class StatisticsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
+          // Row 2: Total Fast (Replaces Average Fast) & Exercises
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -278,8 +275,8 @@ class StatisticsScreen extends ConsumerWidget {
                 Expanded(
                   child: StatCard(
                     icon: Icons.timer_outlined,
-                    title: 'Average Fast',
-                    value: avgFastFormatted,
+                    title: 'Total Fast',
+                    value: totalFastFormatted,
                     iconColor: theme.colorScheme.secondary,
                     onTap: () {
                       Navigator.push(
@@ -359,90 +356,59 @@ class StatisticsScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.md),
             SizedBox(
               height: 160,
-              child: _buildWeeklyChartContent(context, stats, theme),
+              child: BarChart(
+                BarChartData(
+                  maxY: 24,
+                  barTouchData: const BarTouchData(enabled: true),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                          if (value.toInt() >= 0 && value.toInt() < days.length) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(
+                                days[value.toInt()],
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ),
+                  ),
+                  gridData: const FlGridData(show: false),
+                  borderData: FlBorderData(show: false),
+                  barGroups: List.generate(7, (i) {
+                    final val = stats.weeklyData.length > i ? stats.weeklyData[i] : 0.0;
+                    return BarChartGroupData(
+                      x: i,
+                      barRods: [
+                        BarChartRodData(
+                          toY: val.clamp(0, 24).toDouble(),
+                          color: val > 0 ? colorScheme.primary : colorScheme.surfaceContainerHighest,
+                          width: 16,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(AppSpacing.radiusSm),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+              ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildWeeklyChartContent(BuildContext context, StatsData stats, ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-    final hasData = stats.weeklyData.any((v) => v > 0);
-
-    if (!hasData) {
-      return Center(
-        child: Text(
-          'No weekly data logged.',
-          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-        ),
-      );
-    }
-
-    return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceAround,
-        maxY: 24,
-        barTouchData: BarTouchData(
-          enabled: true,
-          touchTooltipData: BarTouchTooltipData(
-            getTooltipColor: (_) => colorScheme.primaryContainer,
-            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-              return BarTooltipItem(
-                '${rod.toY.toStringAsFixed(1)}h',
-                theme.textTheme.labelMedium!.copyWith(
-                  color: colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                ),
-              );
-            },
-          ),
-        ),
-        titlesData: FlTitlesData(
-          show: true,
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-                final idx = value.toInt();
-                if (idx >= 0 && idx < days.length) {
-                  return SideTitleWidget(
-                    meta: meta,
-                    child: Text(
-                      days[idx],
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-          ),
-          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        ),
-        gridData: const FlGridData(show: false),
-        borderData: FlBorderData(show: false),
-        barGroups: List.generate(7, (index) {
-          return BarChartGroupData(
-            x: index,
-            barRods: [
-              BarChartRodData(
-                toY: stats.weeklyData[index],
-                color: colorScheme.primary,
-                width: 14,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(AppSpacing.radiusSm),
-                ),
-              ),
-            ],
-          );
-        }),
       ),
     );
   }
@@ -483,37 +449,28 @@ class StatisticsScreen extends ConsumerWidget {
                   ? BarChart(
                       BarChartData(
                         maxY: 100,
-                        alignment: BarChartAlignment.spaceAround,
-                        barTouchData: BarTouchData(
-                          enabled: true,
-                          touchTooltipData: BarTouchTooltipData(
-                            getTooltipColor: (_) => colorScheme.primaryContainer,
-                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                              return BarTooltipItem(
-                                '${rod.toY.round()}%',
-                                theme.textTheme.labelMedium!.copyWith(
-                                  color: colorScheme.onPrimaryContainer,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                        barTouchData: const BarTouchData(enabled: true),
                         titlesData: FlTitlesData(
                           show: true,
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                           bottomTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
+                              reservedSize: 28,
                               getTitlesWidget: (value, meta) {
                                 final idx = value.toInt();
                                 if (idx >= 0 && idx < mondays.length) {
-                                  return SideTitleWidget(
-                                    meta: meta,
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 6),
                                     child: Text(
                                       'W${idx + 1}',
                                       style: theme.textTheme.labelSmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
+                                        fontWeight: FontWeight.bold,
                                       ),
+                                      textAlign: TextAlign.center,
                                     ),
                                   );
                                 }
@@ -521,20 +478,18 @@ class StatisticsScreen extends ConsumerWidget {
                               },
                             ),
                           ),
-                          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         ),
                         gridData: const FlGridData(show: false),
                         borderData: FlBorderData(show: false),
-                        barGroups: List.generate(mondays.length, (idx) {
+                        barGroups: List.generate(weeklyPercentages.length, (i) {
+                          final pct = weeklyPercentages[i];
                           return BarChartGroupData(
-                            x: idx,
+                            x: i,
                             barRods: [
                               BarChartRodData(
-                                toY: weeklyPercentages[idx],
-                                color: colorScheme.secondary,
-                                width: 16,
+                                toY: pct.clamp(0, 100).toDouble(),
+                                color: pct > 0 ? colorScheme.primary : colorScheme.surfaceContainerHighest,
+                                width: 24,
                                 borderRadius: const BorderRadius.vertical(
                                   top: Radius.circular(AppSpacing.radiusSm),
                                 ),
@@ -546,8 +501,8 @@ class StatisticsScreen extends ConsumerWidget {
                     )
                   : Center(
                       child: Text(
-                        'No monthly trend logged.',
-                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                        'No data available for this month.',
+                        style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                       ),
                     ),
             ),

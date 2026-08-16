@@ -60,6 +60,7 @@ class MonthlyCalendarScreen extends ConsumerWidget {
           return SingleChildScrollView(
             padding: const EdgeInsets.all(AppSpacing.screenPadding),
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Month Header
@@ -76,8 +77,13 @@ class MonthlyCalendarScreen extends ConsumerWidget {
                 // Calendar Grid Card
                 AppCard.elevated(
                   padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Column(
-                    children: [
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+
                       // Weekday Initials Header Row
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -166,7 +172,9 @@ class MonthlyCalendarScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
 
                 // Statistics Summary Section
                 Text(

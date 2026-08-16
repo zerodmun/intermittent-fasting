@@ -30,9 +30,12 @@ Future<void> main() async {
   // Load environment variables (.env) safely
   try {
     await dotenv.load(fileName: '.env');
-  } catch (e) {
-    LoggerService.e('main: Failed to load .env file', e);
+    LoggerService.i('.env loaded');
+  } catch (_) {
+    // .env is optional; silently use default configuration
   }
+
+
 
   // Enforce completely offline typography loading
   GoogleFonts.config.allowRuntimeFetching = false;

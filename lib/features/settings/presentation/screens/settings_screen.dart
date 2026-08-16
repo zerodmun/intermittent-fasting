@@ -7,6 +7,13 @@ import 'package:fast_flow/features/settings/presentation/providers/settings_prov
 import 'package:fast_flow/shared/widgets/app_card.dart';
 import 'package:fast_flow/shared/widgets/section_header.dart';
 
+
+
+import 'package:fast_flow/core/services/auth_service.dart';
+import 'package:fast_flow/core/services/fcm_service.dart';
+
+import 'package:fast_flow/core/providers/app_providers.dart';
+
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -16,6 +23,10 @@ class SettingsScreen extends ConsumerWidget {
     final themeNotifier = ref.read(themeModeProvider.notifier);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    
+    final authState = ref.watch(authStateProvider);
+    final user = authState.asData?.value ?? AuthService.instance.currentUser;
+    final deviceId = FcmService.instance.getOrCreateDeviceId();
 
     return Scaffold(
       appBar: AppBar(
@@ -27,6 +38,31 @@ class SettingsScreen extends ConsumerWidget {
           vertical: AppSpacing.md,
         ),
         children: [
+          AppCard.elevated(
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                user != null ? Icons.account_circle_rounded : Icons.account_circle_outlined,
+                color: colorScheme.primary,
+                size: 32,
+              ),
+              title: Text(
+                user != null ? (user.email ?? 'Authenticated Account') : 'Guest User (Local Identity)',
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                user != null
+                    ? 'Linked Device: $deviceId'
+                    : 'Local device identity active. Tap to manage account.',
+                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
+              trailing: Icon(Icons.chevron_right_rounded, color: colorScheme.primary),
+              onTap: () => context.push('/account'),
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
           const SectionHeader(title: 'Appearance'),
           AppCard.elevated(
             child: ListTile(

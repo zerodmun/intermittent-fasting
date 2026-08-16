@@ -133,40 +133,45 @@ class HistoryScreen extends ConsumerWidget {
       key: const ValueKey('calendar_view'),
       padding: const EdgeInsets.all(AppSpacing.screenPadding),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AppCard.elevated(
             padding: const EdgeInsets.all(AppSpacing.sm),
-            child: TableCalendar<FastingRecord>(
-              firstDay: DateTime.now().subtract(const Duration(days: 365)),
-              lastDay: DateTime.now().add(const Duration(days: 30)),
-              focusedDay: selectedDay,
-              selectedDayPredicate: (day) => day.isSameDay(selectedDay),
-              eventLoader: (day) => _getEventsForDay(ref, day),
-              calendarFormat: CalendarFormat.month,
-              headerStyle: const HeaderStyle(
-                formatButtonVisible: false,
-                titleCentered: true,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: TableCalendar<FastingRecord>(
+                firstDay: DateTime.now().subtract(const Duration(days: 365)),
+                lastDay: DateTime.now().add(const Duration(days: 30)),
+                focusedDay: selectedDay,
+                selectedDayPredicate: (day) => day.isSameDay(selectedDay),
+                eventLoader: (day) => _getEventsForDay(ref, day),
+                calendarFormat: CalendarFormat.month,
+                headerStyle: const HeaderStyle(
+                  formatButtonVisible: false,
+                  titleCentered: true,
+                ),
+                calendarStyle: CalendarStyle(
+                  todayDecoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.35),
+                    shape: BoxShape.circle,
+                  ),
+                  selectedDecoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  markerDecoration: BoxDecoration(
+                    color: context.colors.success,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                onDaySelected: (selected, focused) {
+                  ref.read(selectedDayProvider.notifier).select(selected);
+                },
               ),
-              calendarStyle: CalendarStyle(
-                todayDecoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.35),
-                  shape: BoxShape.circle,
-                ),
-                selectedDecoration: BoxDecoration(
-                  color: theme.colorScheme.primary,
-                  shape: BoxShape.circle,
-                ),
-                markerDecoration: BoxDecoration(
-                  color: context.colors.success,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              onDaySelected: (selected, focused) {
-                ref.read(selectedDayProvider.notifier).select(selected);
-              },
             ),
           ),
+
           const SizedBox(height: AppSpacing.lg),
           if (selectedRecord != null) ...[
             Text(
@@ -198,10 +203,13 @@ class HistoryScreen extends ConsumerWidget {
   void _confirmDelete(BuildContext context, WidgetRef ref, String id) async {
     final confirm = await AppDialog.showConfirm(
       context: context,
-      title: 'Delete Fast Log',
-      content: 'Are you sure you want to permanently delete this fasting record?',
+      title: 'Delete this data?',
+      content: 'This data will be permanently removed. This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
       isDestructive: true,
     );
+
 
     if (confirm == true) {
       await ref.read(historyProviderNotifier.notifier).deleteRecord(id);
@@ -379,10 +387,13 @@ class HistoryScreen extends ConsumerWidget {
                 onPressed: () async {
                   final confirm = await AppDialog.showConfirm(
                     context: context,
-                    title: 'Delete Log',
-                    content: 'Are you sure you want to delete this fasting record?',
+                    title: 'Delete this data?',
+                    content: 'This data will be permanently removed. This action cannot be undone.',
+                    confirmLabel: 'Delete',
+                    cancelLabel: 'Cancel',
                     isDestructive: true,
                   );
+
                   if (confirm == true && context.mounted) {
                     await ref.read(historyProviderNotifier.notifier).deleteRecord(existing.id);
                     if (context.mounted) {

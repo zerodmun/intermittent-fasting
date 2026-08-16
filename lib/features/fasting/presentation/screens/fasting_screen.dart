@@ -66,11 +66,16 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
           ),
           const SizedBox(height: AppSpacing.md),
           Expanded(
-            child: AnimatedSwitcher(
-              duration: AppAnimations.medium,
-              child: _buildSegmentContent(state, notifier),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: AnimatedSwitcher(
+                duration: AppAnimations.medium,
+                child: _buildSegmentContent(state, notifier),
+              ),
             ),
           ),
+
+
         ],
       ),
     );
@@ -451,11 +456,16 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
       key: const ValueKey('calendar_segment'),
       padding: const EdgeInsets.all(AppSpacing.screenPadding),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AppCard.elevated(
             padding: const EdgeInsets.all(AppSpacing.sm),
-            child: TableCalendar(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: TableCalendar(
+
+
               firstDay: DateTime.now().subtract(const Duration(days: 365)),
               lastDay: DateTime.now().add(const Duration(days: 365)),
               focusedDay: _focusedDay,
@@ -492,6 +502,8 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
               },
             ),
           ),
+        ),
+
           const SizedBox(height: AppSpacing.lg),
 
           SectionHeader(title: 'Details for ${DateFormat('MMMM dd').format(_selectedDay)}'),
@@ -546,6 +558,8 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
       ),
     );
   }
+
+
 
   // ── LOG MUTATIONS ──
   void _editDaySchedule(BuildContext context, int weekdayNum, DailySchedule current, FastingStateNotifier notifier) async {
@@ -638,6 +652,8 @@ class _FastingScreenState extends ConsumerState<FastingScreen> {
       ),
     );
   }
+
+
 
   void _editManualLogSheet(BuildContext context, FastingRecord existing, FastingStateNotifier notifier) {
     final noteController = TextEditingController(text: existing.note ?? '');

@@ -4,15 +4,22 @@ A modern, offline-first Flutter application for intermittent fasting tracking an
 
 ## Features
 
+### Authentication, Account Switching & Legacy Data Safety
+- **Multi-Account Support & Complete Data Isolation** - One physical device can securely host multiple Firebase accounts. Switching accounts immediately swaps local Hive namespaces (`profile_$uid`, `schedule_$uid`) without cross-account data leakage.
+- **Safe Anonymous-to-Cloud Data Migration** - Users who used the app offline for weeks or months without logging in do not lose historical data. When registering or claiming an account, local data is safely bound to the authenticated Firebase UID.
+- **Production-Ready Forgot Password & Reset Password Flow** - Dedicated secure screens (`/forgot-password`, `/reset-password`) using Firebase Authentication OOB email verification. Features live validation, visibility toggles, and zero local password/token storage.
+- **Device Binding Transfer & Restriction Protection** - Firestore device mapping enforces single-device ownership while allowing seamless local multi-account switching.
+
 ### Fasting Tracker & Notifications
-- **Schedule-driven engine** - No start/stop buttons needed. The app automatically determines your fasting state from the current time and your daily schedule.
-- **Real-time countdown** - Live timer updating every second with circular progress ring.
-- **Scheduled Fasting Reminders** - Configurable scheduled alerts (10 min before fasting, at fasting start, 10 min before Iftar, at Iftar time) with custom raw sound resources (`fast.mp3`, `eat.mp3`, System Default, or Silent).
+- **Schedule-Driven Engine** - No start/stop buttons needed. The app automatically determines your fasting state from the current time and your daily schedule.
+- **Real-Time Countdown** - Live timer updating every second with circular progress ring.
+- **Primary vs Fallback Notification Delivery** - Local OS AlarmManager (`zonedSchedule`) acts as the Primary delivery mechanism (0ms latency, exact OS alarm) while FCM acts strictly as Fallback.
+- **Zero Duplicate Sound Guarantee** - Multi-format canonical event resolution prevents duplicate notifications and sounds across Screen ON, Screen OFF, and LOCKED device states.
+- **Custom Sound Channels** - `FASTING_START` plays `fast.mp3` (`fasting_reminders_fast_v2`), `EAT_TIME` / `FASTING_END` plays `eat.mp3` (`fasting_reminders_eat_v2`), with system default for 10-minute alerts.
 - **Timezone-Safe Alarm Scheduling** - Exact alarms via `AndroidScheduleMode.exactAllowWhileIdle` and timezone-safe `tz.TZDateTime`.
-- **Multiple fasting windows** - Different fasting/eating times for each day of the week.
-- **Timeline view** - Yesterday, Today, Tomorrow with scheduled vs actual times.
-- **Calendar view** - Monthly overview with completion markers.
-- **Manual overrides** - Mark sessions as completed, skipped, or cancelled with custom times.
+- **Multiple Fasting Windows** - Different fasting/eating times for each day of the week.
+- **Timeline & Calendar Views** - Yesterday, Today, Tomorrow with scheduled vs actual times, and monthly overview with completion markers.
+- **Manual Overrides** - Mark sessions as completed, skipped, or cancelled with custom times.
 
 ### High-Performance Startup & Cloud Sync
 - **Non-Blocking Fast Startup (<0.85s)** - Main screen UI renders in under 850ms by deferring heavy network and background initializations to post-frame execution.
@@ -26,20 +33,21 @@ A modern, offline-first Flutter application for intermittent fasting tracking an
 - **Total Calories Consumed** - Real-time summation of calories from all food logs.
 - **Average Fast Details** - Comprehensive fast metrics incorporating shortest, longest, and average fasting durations.
 - **Standalone Exercises Journal** - Log workouts, sets, reps, weights, and ACSM MET estimated calories burned.
+- **Clean Responsive Monthly Trend** - Formatted `W1`, `W2`, `W3`, `W4` charts without text clipping or layout overflow.
 
 ### Body Composition & History
 - **US Navy Body Fat Formula** - Accurate body fat % from waist, neck, hip measurements.
-- **Automatic calculations** - BMI, BMR, TDEE, Lean Mass, Fat Mass.
-- **Health categories** - Essential Fat, Athlete, Fitness, Average, Obese (gender-specific).
-- **Progress photos** - Front, side, back views with timeline.
-- **Measurement history** - Weight, waist, neck, hip, chest, arms, thighs, calves.
+- **Automatic Calculations** - BMI, BMR, TDEE, Lean Mass, Fat Mass.
+- **Health Categories** - Essential Fat, Athlete, Fitness, Average, Obese (gender-specific).
+- **Progress Photos** - Front, side, back views with timeline.
+- **Measurement History** - Weight, waist, neck, hip, chest, arms, thighs, calves.
 - **Charts** - Weight, body fat %, lean mass, fat mass, BMI (weekly/monthly/yearly/all time).
 
 ### Smart Robustness Features
 - **100% Offline Core Logic** - Bundled local Google Fonts (Inter) assets and disabled runtime network fetching.
 - **Fail-Safe Hive Storage** - Box openings run with 4-level automatic recovery/deletion and temp path fallbacks.
-- **Data export/import** - Full JSON backup/restore.
-- **Dark/Light theme** - System-aware with manual override.
+- **Data Export/Import** - Full JSON backup/restore.
+- **Dark/Light Theme** - System-aware with manual override.
 - **Onboarding** - 4-step setup flow (Welcome, Profile, Goals, Schedule).
 
 ---

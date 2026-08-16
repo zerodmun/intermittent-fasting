@@ -31,8 +31,10 @@ class HistoryGenerator {
 
       // Only generate history for sessions that have completely finished
       if (expectedEnd.isBefore(now)) {
+        if (!HiveService.instance.fastingRecordsBox.isOpen) return;
         final existing = getRecordForSession(expectedStart);
         if (existing == null) {
+          if (!HiveService.instance.fastingRecordsBox.isOpen) return;
           final durationMinutes = expectedEnd.difference(expectedStart).inMinutes;
           final record = FastingRecord(
             id: sessionId,
@@ -46,6 +48,7 @@ class HistoryGenerator {
           await HiveService.instance.saveFastingRecord(record);
         }
       }
+
     }
   }
 }

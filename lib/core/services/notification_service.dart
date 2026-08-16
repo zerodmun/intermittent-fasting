@@ -533,42 +533,7 @@ class NotificationService {
     if (_isSchedulingFasting) return;
     _isSchedulingFasting = true;
     try {
-      await cancelAll();
-
-      final enabled = HiveService.instance.getSetting<bool>('notifications_enabled') ?? true;
-      if (!enabled) {
-        if (kDebugMode) {
-          debugPrint('[NotificationService] Reschedule completed: notifications disabled');
-        }
-        return;
-      }
-
-      final eatingEnabled = HiveService.instance.getSetting<bool>('eating_notification_enabled') ?? true;
-      final fastingEnabled = HiveService.instance.getSetting<bool>('fasting_notification_enabled') ?? true;
-
-      final schedule = HiveService.instance.fastingSchedule;
-      final now = DateTime.now();
-
-      final list = calculateNotificationsToSchedule(
-        schedule: schedule,
-        now: now,
-        getRecordForSession: FastingEngine().getRecordForSession,
-        eatingEnabled: eatingEnabled,
-        fastingEnabled: fastingEnabled,
-      );
-
-      for (final n in list) {
-        await _scheduleOneShotNotification(
-          id: n.id,
-          title: n.title,
-          body: n.body,
-          scheduledDate: n.scheduledDate,
-        );
-      }
-
-      if (kDebugMode) {
-        debugPrint('[NotificationService] Rescheduled ${list.length} notifications');
-      }
+      await scheduleReminderNotifications('Fasting Notification Schedule');
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[NotificationService] Failed scheduling notifications: $e');
@@ -578,12 +543,15 @@ class NotificationService {
     }
   }
 
-  Future<void> _scheduleOneShotNotification({
+
+  @visibleForTesting
+  Future<void> scheduleOneShotNotification({
     required int id,
     required String title,
     required String body,
     required DateTime scheduledDate,
   }) async {
+
     try {
       final tzDate = tz.TZDateTime.from(scheduledDate, tz.local);
       if (tzDate.isBefore(tz.TZDateTime.now(tz.local))) {
@@ -648,6 +616,22 @@ class NotificationService {
   Future<void> cancelAll() async {
     try {
       await _notifications.cancelAll();
+      await HiveService.instance.clearLocalScheduledEvents();
+      // ignore: avoid_print
+      print(
+        '[NOTIFICATION-TRACE]\n\n'
+        'eventId: N/A\n'
+        'eventType: N/A\n'
+        'notificationId: ALL\n\n'
+        'source: LOCAL_ALARM\n\n'
+        'scheduledAt: N/A\n'
+        'triggerAt: N/A\n'
+        'executedAt: ${DateTime.now().toIso8601String()}\n\n'
+        'channelId: N/A\n'
+        'soundResource: N/A\n\n'
+        'scheduleVersion: ${NotificationSyncService.instance.localVersion}\n'
+        'action: cancelAll',
+      );
       if (kDebugMode) {
         debugPrint('[NotificationService] Notification cancelled');
       }
@@ -689,13 +673,33 @@ class NotificationService {
   /// Cancels only the four reminder notification IDs without touching existing notifications
   Future<void> cancelReminderNotifications() async {
     for (final id in _reminderIds) {
-      await _notifications.cancel(id);
+      try {
+        await _notifications.cancel(id);
+      } catch (_) {}
       _currentlyScheduledReminders.remove(id);
     }
+    await HiveService.instance.clearLocalScheduledEvents();
+
+    // ignore: avoid_print
+    print(
+      '[NOTIFICATION-TRACE]\n\n'
+      'eventId: N/A\n'
+      'eventType: N/A\n'
+      'notificationId: 2000-2003\n\n'
+      'source: LOCAL_ALARM\n\n'
+      'scheduledAt: N/A\n'
+      'triggerAt: N/A\n'
+      'executedAt: ${DateTime.now().toIso8601String()}\n\n'
+      'channelId: N/A\n'
+      'soundResource: N/A\n\n'
+      'scheduleVersion: ${NotificationSyncService.instance.localVersion}\n'
+      'action: cancel',
+    );
     if (kDebugMode) {
       debugPrint('[NotificationService] Reminder notifications cancelled (IDs 2000-2003)');
     }
   }
+
 
   /// Schedules the four fasting reminder notifications based on today's schedule.
   /// 10-Step Deterministic Scheduling Lifecycle:
@@ -1075,10 +1079,6 @@ AndroidNotificationSound? getFastingReminderSound({
       presentSound: soundPref != 'silent',
     );
 
-    final soundName = androidDetails.channelId == 'fasting_reminders_fast_v2'
-        ? 'fast'
-        : (androidDetails.channelId == 'fasting_reminders_eat_v2' ? 'eat' : 'default_system');
-
     String eventTypeStr = 'UNKNOWN';
     if (id == _reminderFastingSoonId) {
       eventTypeStr = 'FASTING_START_SOON';
@@ -1090,36 +1090,46 @@ AndroidNotificationSound? getFastingReminderSound({
       eventTypeStr = 'FASTING_END';
     }
 
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] Scheduling notification');
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] eventType: $eventTypeStr');
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] notificationId: $id');
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] channelId: ${androidDetails.channelId}');
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] sound: $soundName');
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] playSound: ${androidDetails.playSound}');
+    final soundName = androidDetails.channelId == 'fasting_reminders_fast_v2'
+        ? 'fast'
+        : (androidDetails.channelId == 'fasting_reminders_eat_v2' ? 'eat' : 'default_system');
 
-    final nowTs = DateTime.now().toIso8601String();
+    final eventIdStr = '${NotificationSyncService.scheduleId}_${scheduledDate.toIso8601String()}_$eventTypeStr';
+    final eventKey = '${scheduledDate.year}_${scheduledDate.month}_${scheduledDate.day}_${scheduledDate.hour}_${scheduledDate.minute}_$eventTypeStr';
+    await HiveService.instance.markEventScheduledLocally(eventKey, scheduledDate);
+    await HiveService.instance.saveDeliveryRecord(
+      eventId: eventIdStr,
+      data: {
+        'eventId': eventIdStr,
+        'eventType': eventTypeStr,
+        'scheduledAt': scheduledDate.toIso8601String(),
+        'notificationId': id,
+        'channelId': androidDetails.channelId,
+        'soundResource': soundName,
+        'scheduleVersion': NotificationSyncService.instance.localVersion,
+        'deliverySource': 'LOCAL_ALARM',
+        'status': 'SCHEDULED_LOCAL',
+        'uid': HiveService.instance.currentActiveUserId,
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+    );
+
     // ignore: avoid_print
-    print('[SOUND-TIMING] BEFORE_NOTIFICATION_CALL');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] eventType: $eventTypeStr');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] notificationId: $id');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] channelId: ${androidDetails.channelId}');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] sound: $soundName');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] playSound: ${androidDetails.playSound}');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] scheduledFor: ${scheduledDate.toIso8601String()}');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] timestamp: $nowTs');
+    print(
+      '[NOTIFICATION-TRACE]\n\n'
+      'eventId: $eventIdStr\n'
+      'eventType: $eventTypeStr\n'
+      'notificationId: $id\n\n'
+      'source: LOCAL_ALARM\n\n'
+      'scheduledAt: ${scheduledDate.toIso8601String()}\n'
+      'triggerAt: ${scheduledDate.toIso8601String()}\n'
+      'executedAt: ${DateTime.now().toIso8601String()}\n\n'
+      'channelId: ${androidDetails.channelId}\n'
+      'soundResource: $soundName\n\n'
+      'scheduleVersion: ${NotificationSyncService.instance.localVersion}\n'
+      'deliveryState: SCHEDULED_LOCAL\n'
+      'action: zonedSchedule',
+    );
 
     final isCustomSoundChannel = androidDetails.channelId == 'fasting_reminders_fast_v2' ||
         androidDetails.channelId == 'fasting_reminders_eat_v2';
@@ -1196,19 +1206,12 @@ AndroidNotificationSound? getFastingReminderSound({
     required String eventType,
     String? rawType,
   }) async {
-    // 1. Check event deduplication
-    if (HiveService.instance.isEventProcessed(eventId)) {
-      if (kDebugMode) {
-        debugPrint('[Notification] Event $eventId already processed - skipping duplicate notification');
-      }
-      return;
-    }
+    final normalized = normalizeEventType(eventType);
+    final now = DateTime.now();
 
     String title;
     String body;
     int id;
-
-    final normalized = normalizeEventType(eventType);
 
     switch (normalized) {
       case 'FASTING_START_SOON':
@@ -1221,10 +1224,6 @@ AndroidNotificationSound? getFastingReminderSound({
         title = 'Fasting Started';
         body = 'Your fasting has officially begun.';
         id = _reminderFastingStartId;
-        if (kDebugMode) {
-          debugPrint('[Notification] Showing fasting start reminder');
-          debugPrint('[Notification] Sound: fast.mp3');
-        }
         break;
 
       case 'FASTING_END_SOON':
@@ -1237,10 +1236,6 @@ AndroidNotificationSound? getFastingReminderSound({
         title = 'It\'s Time to Break Your Fast';
         body = 'May your fasting be accepted. Enjoy your meal.';
         id = _reminderIftarTimeId;
-        if (kDebugMode) {
-          debugPrint('[Notification] Showing fasting end reminder');
-          debugPrint('[Notification] Sound: eat.mp3');
-        }
         break;
 
       default:
@@ -1278,63 +1273,55 @@ AndroidNotificationSound? getFastingReminderSound({
         ? 'fast'
         : (androidDetails.channelId == 'fasting_reminders_eat_v2' ? 'eat' : 'default_system');
 
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] Displaying FCM trigger notification');
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] eventType: $normalized');
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] notificationId: $id');
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] eventId: $eventId');
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] channelId: ${androidDetails.channelId}');
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] sound: $soundName');
-    // ignore: avoid_print
-    print('[SOUND-VERIFY] playSound: ${androidDetails.playSound}');
+    // 1. Atomic claim evaluation: Check durable registry to eliminate race conditions between isolates / delivery channels
+    final claimGranted = await HiveService.instance.tryClaimNotificationDelivery(
+      eventId: eventId,
+      source: 'FCM',
+      eventType: normalized,
+      scheduledDate: now,
+    );
 
-    final nowTs = DateTime.now().toIso8601String();
-    const isRelease = kReleaseMode;
-    // ignore: avoid_print
-    print('[SOUND-RELEASE-VERIFY]');
-    // ignore: avoid_print
-    print('eventType: $normalized');
-    // ignore: avoid_print
-    print('notificationId: $id');
-    // ignore: avoid_print
-    print('channelId: ${androidDetails.channelId}');
-    // ignore: avoid_print
-    print('soundResource: $soundName');
-    // ignore: avoid_print
-    print('playSound: ${androidDetails.playSound}');
-    // ignore: avoid_print
-    print('isRelease: $isRelease');
+    if (!claimGranted) {
+      // ignore: avoid_print
+      print(
+        '[NOTIFICATION-TRACE]\n\n'
+        'eventId: $eventId\n'
+        'eventType: $normalized\n'
+        'notificationId: $id\n\n'
+        'source: FCM\n\n'
+        'scheduledAt: ${now.toIso8601String()}\n'
+        'triggerAt: ${now.toIso8601String()}\n'
+        'executedAt: ${now.toIso8601String()}\n\n'
+        'channelId: ${androidDetails.channelId}\n'
+        'soundResource: $soundName\n\n'
+        'scheduleVersion: ${NotificationSyncService.instance.localVersion}\n'
+        'deliveryState: FCM_SKIPPED_LOCAL_PRIMARY\n'
+        'action: skipped_duplicate_primary_alarm',
+      );
+      return;
+    }
 
+    // 2. Fallback Delivery: Local Alarm was not scheduled/handled, so FCM delivers as fallback
     // ignore: avoid_print
-    print('[SOUND-TIMING] BEFORE_NOTIFICATION_SHOW');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] eventType: $normalized');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] notificationId: $id');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] eventId: $eventId');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] channelId: ${androidDetails.channelId}');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] sound: $soundName');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] playSound: ${androidDetails.playSound}');
-    // ignore: avoid_print
-    print('[SOUND-TIMING] timestamp: $nowTs');
+    print(
+      '[NOTIFICATION-TRACE]\n\n'
+      'eventId: $eventId\n'
+      'eventType: $normalized\n'
+      'notificationId: $id\n\n'
+      'source: FCM\n\n'
+      'scheduledAt: ${now.toIso8601String()}\n'
+      'triggerAt: ${now.toIso8601String()}\n'
+      'executedAt: ${now.toIso8601String()}\n\n'
+      'channelId: ${androidDetails.channelId}\n'
+      'soundResource: $soundName\n\n'
+      'scheduleVersion: ${NotificationSyncService.instance.localVersion}\n'
+      'deliveryState: FCM_FALLBACK_DELIVERY\n'
+      'action: show',
+    );
+
 
     final isCustomSoundChannel = androidDetails.channelId == 'fasting_reminders_fast_v2' ||
         androidDetails.channelId == 'fasting_reminders_eat_v2';
-
-    final receivedTime = DateTime.now().toIso8601String();
-    if (kDebugMode) {
-      debugPrint('[Notification] Event received: $receivedTime');
-      debugPrint('[Notification] Calling show(): ${DateTime.now().toIso8601String()}');
-    }
 
     try {
       await _notifications.show(
@@ -1343,24 +1330,6 @@ AndroidNotificationSound? getFastingReminderSound({
         body,
         NotificationDetails(android: androidDetails, iOS: iosDetails),
       );
-
-      final afterShowTs = DateTime.now().toIso8601String();
-      // ignore: avoid_print
-      print('[SOUND-TIMING] AFTER_SHOW');
-      // ignore: avoid_print
-      print('[SOUND-TIMING] eventType: $normalized');
-      // ignore: avoid_print
-      print('[SOUND-TIMING] notificationId: $id');
-      // ignore: avoid_print
-      print('[SOUND-TIMING] eventId: $eventId');
-      // ignore: avoid_print
-      print('[SOUND-TIMING] channelId: ${androidDetails.channelId}');
-      // ignore: avoid_print
-      print('[SOUND-TIMING] timestamp: $afterShowTs');
-
-      if (kDebugMode) {
-        debugPrint('[Notification] show() completed: ${DateTime.now().toIso8601String()}');
-      }
 
       // Mark event as processed to complete deduplication
       await HiveService.instance.markEventProcessed(eventId);
@@ -1388,15 +1357,12 @@ AndroidNotificationSound? getFastingReminderSound({
         }
       } else {
         if (kDebugMode) {
-          debugPrint('[Notification] FAILED');
-          debugPrint('notificationId: $id');
-          debugPrint('channelId: ${androidDetails.channelId}');
-          debugPrint('eventType: $eventType');
-          debugPrint('error: $e');
+          debugPrint('[Notification] FAILED: $e');
         }
       }
     }
   }
+
 
   /// Displays an immediate notification triggered by an incoming FCM push event.
   Future<void> displayRemoteNotification({

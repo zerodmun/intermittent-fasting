@@ -2,6 +2,22 @@
 
 All notable changes to the **Fomo IF** project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-08-16
+### Added
+- **Multi-Account Authentication & Data Partitioning**: Implemented secure Firebase Authentication supporting multiple user accounts on a single physical device with strict data isolation (`profile_$uid`, `schedule_$uid`).
+- **Safe Anonymous-to-Cloud Data Claiming Flow**: Introduced `UserDataMigrationService` to automatically preserve and claim existing legacy/offline Hive data upon registration or login without data loss or duplicate account creation.
+- **Production-Ready Forgot Password & Password Reset Flow**: Created dedicated `/forgot-password` and `/reset-password` screens with real-time email regex validation, disabled submit states, Firebase OOB verification code processing, and password policy enforcement.
+- **Canonical Multi-Format Notification Event Resolution**: Engineered a multi-tier canonical event resolution engine (`HiveService.generateAllEventAliases`, `tryClaimNotificationDelivery`) that maps divergent event ID schemas between local alarms and Cloudflare Worker cron jobs, guaranteeing exactly ONE notification and ONE sound across Screen ON, Screen OFF, and LOCKED device states.
+- **Durable Notification Delivery State Machine**: Persisted delivery records across app restarts, device reboots, and background isolate lifecycles (`SCHEDULED_LOCAL`, `DELIVERED_LOCAL`, `FCM_SKIPPED_LOCAL_PRIMARY`, `DELIVERED_FCM`, `COMPLETED`).
+- **Comprehensive 121-Test Automated Suite**: Added complete automated unit/integration suites covering account switching, anonymous claiming, Hive key safety, forgot password flows, and 15 notification delivery race-condition scenarios.
+
+### Changed
+- **Account Screen UI**: Enforced controlled, fixed-height dimensions for "Switch Account" and "Log Out" buttons to prevent vertical expansion on large-display devices while preserving standard typography, icons, and padding.
+- **Settings Screen UI**: Removed redundant "Account & Security" section header while preserving the direct account tile presentation and navigation.
+- **Statistics Screen Monthly Trend**: Formatted x-axis labels to clean, prominent `W1`, `W2`, `W3`, `W4` week markers with proper `reservedSize: 28`, eliminating text clipping and chart overlaps.
+
+---
+
 ## [0.9.0] — 2026-08-14
 ### Added
 - **Startup Performance Optimization (>8.6x Speedup)**: Refactored startup flow into lightweight `initLocal()` + async `initBackgroundServices()`. Accelerated First Flutter Frame rendering from **7.37s** to **<0.85s** by deferring FCM token fetch, Firestore schedule version sync, and AlarmManager notification scheduling to post-frame asynchronous execution.

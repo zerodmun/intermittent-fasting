@@ -8,7 +8,9 @@ import 'package:fast_flow/core/extensions/context_extensions.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/shared/widgets/app_card.dart';
+import 'package:fast_flow/shared/widgets/app_dialog.dart';
 import 'package:fast_flow/shared/widgets/app_input.dart';
+
 import 'package:fast_flow/shared/widgets/empty_state.dart';
 import 'package:fast_flow/features/food/presentation/providers/food_logs_provider.dart';
 import 'package:fast_flow/core/services/food_api_service.dart';
@@ -535,9 +537,21 @@ class _FoodIntakeSummaryScreenState extends ConsumerState<FoodIntakeSummaryScree
                                     ),
                                     const SizedBox(height: 4),
                                     GestureDetector(
-                                      onTap: () {
-                                        ref.read(foodLogsProvider.notifier).deleteFoodLog(log.id);
-                                        context.showSnack('Food entry deleted', isSuccess: true);
+                                      onTap: () async {
+                                        final confirm = await AppDialog.showConfirm(
+                                          context: context,
+                                          title: 'Delete this data?',
+                                          content: 'This data will be permanently removed. This action cannot be undone.',
+                                          confirmLabel: 'Delete',
+                                          cancelLabel: 'Cancel',
+                                          isDestructive: true,
+                                        );
+                                         if (confirm == true) {
+                                           ref.read(foodLogsProvider.notifier).deleteFoodLog(log.id);
+                                           if (context.mounted) {
+                                             context.showSnack('Food entry deleted', isSuccess: true);
+                                           }
+                                         }
                                       },
                                       child: Icon(
                                         Icons.delete_outline_rounded,

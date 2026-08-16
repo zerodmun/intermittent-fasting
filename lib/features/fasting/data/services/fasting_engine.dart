@@ -140,12 +140,18 @@ class FastingEngine {
   }
 
   Future<void> _autoGenerateHistory() async {
+    if (!_isInitialized) return;
     final schedule = HiveService.instance.fastingSchedule;
+    if (!_isInitialized) return;
     await HistoryGenerator.autoGenerateHistory(
       schedule: schedule,
-      getRecordForSession: getRecordForSession,
+      getRecordForSession: (start) {
+        if (!_isInitialized) return null;
+        return getRecordForSession(start);
+      },
     );
   }
+
 
   /// Retained for compatibility but updated to search the timeline-based records.
   FastingRecord? getRecordForSession(DateTime expectedStart) {

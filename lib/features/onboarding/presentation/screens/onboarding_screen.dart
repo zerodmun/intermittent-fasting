@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:fast_flow/core/providers/app_providers.dart';
 import 'package:fast_flow/core/constants/app_spacing.dart';
 import 'package:fast_flow/core/constants/app_animations.dart';
 import 'package:fast_flow/core/extensions/context_extensions.dart';
@@ -60,12 +59,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Future<void> _finishOnboarding() async {
     await ref.read(onboardingProvider.notifier).completeOnboarding();
-    final prefs = ref.read(sharedPreferencesProvider);
-    await prefs.setBool('onboarding_complete', true);
     if (mounted) {
       context.go('/home');
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

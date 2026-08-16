@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fast_flow/core/services/hive_service.dart';
 
 import 'package:fast_flow/features/fasting/presentation/screens/fasting_screen.dart';
+
 import 'package:fast_flow/features/history/presentation/screens/history_screen.dart';
 import 'package:fast_flow/features/home/presentation/screens/home_screen.dart';
 import 'package:fast_flow/features/onboarding/presentation/screens/onboarding_screen.dart';
@@ -20,7 +22,13 @@ import 'package:fast_flow/features/food/presentation/screens/ai_camera_preview_s
 import 'package:fast_flow/features/food/presentation/screens/ai_food_result_screen.dart';
 import 'package:fast_flow/features/food/data/models/food_product.dart';
 import 'package:fast_flow/features/food/data/models/food_recognition_model.dart';
+import 'package:fast_flow/features/auth/presentation/screens/login_screen.dart';
+import 'package:fast_flow/features/auth/presentation/screens/register_screen.dart';
+import 'package:fast_flow/features/auth/presentation/screens/forgot_password_screen.dart';
+import 'package:fast_flow/features/auth/presentation/screens/reset_password_screen.dart';
 import 'package:fast_flow/shared/widgets/app_scaffold.dart';
+
+import 'package:fast_flow/features/auth/presentation/screens/account_screen.dart';
 
 /// App-wide route configuration using GoRouter with shell routing.
 class AppRouter {
@@ -29,6 +37,11 @@ class AppRouter {
   AppRouter({required this.prefs});
 
   static const String onboarding = '/onboarding';
+  static const String login = '/login';
+  static const String register = '/register';
+  static const String forgotPassword = '/forgot-password';
+  static const String resetPassword = '/reset-password';
+  static const String account = '/account';
   static const String home = '/home';
   static const String history = '/home/history';
   static const String foodScanner = '/food-scanner';
@@ -47,20 +60,57 @@ class AppRouter {
   late final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: home,
-    debugLogDiagnostics: false,
     redirect: (context, state) {
-      final onboarded = prefs.getBool('onboarding_complete') ?? false;
+      if (state.matchedLocation == '/') return home;
       final isOnboarding = state.matchedLocation == onboarding;
 
-      if (!onboarded && !isOnboarding) return onboarding;
+      final isLogin = state.matchedLocation == login;
+      final isRegister = state.matchedLocation == register;
+      final isAccount = state.matchedLocation == account;
+      final isForgotPassword = state.matchedLocation == forgotPassword || state.matchedLocation.startsWith(forgotPassword);
+      final isResetPassword = state.matchedLocation == resetPassword || state.matchedLocation.startsWith(resetPassword);
+
+      final onboarded = HiveService.instance.hasCompletedOnboardingForUser();
+
+      if (!onboarded && !isOnboarding && !isLogin && !isRegister && !isAccount && !isForgotPassword && !isResetPassword) return onboarding;
       if (onboarded && isOnboarding) return home;
       return null;
     },
+
     routes: [
       GoRoute(
         path: onboarding,
         builder: (context, state) => const OnboardingScreen(),
       ),
+      GoRoute(
+        path: login,
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: register,
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: forgotPassword,
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'];
+          return ForgotPasswordScreen(initialEmail: email);
+        },
+      ),
+      GoRoute(
+        path: resetPassword,
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'];
+          final code = state.uri.queryParameters['code'] ?? state.uri.queryParameters['oobCode'];
+          return ResetPasswordScreen(email: email, initialCode: code);
+        },
+      ),
+      GoRoute(
+        path: account,
+        builder: (context, state) => const AccountScreen(),
+      ),
+
+
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return AppScaffold(
