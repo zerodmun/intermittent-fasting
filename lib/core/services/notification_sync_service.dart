@@ -18,7 +18,9 @@ class NotificationSyncService {
   FirebaseFirestore? _customFirestore;
   FirebaseFirestore get _firestore => _customFirestore ?? FirebaseFirestore.instance;
 
-  String get userId {
+  /// Authoritative authenticated Firebase UID.
+  /// Returns null if no user is currently authenticated.
+  String? get authenticatedUserId {
     try {
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null && firebaseUser.uid.isNotEmpty) {
@@ -27,6 +29,12 @@ class NotificationSyncService {
     } catch (_) {
       // Firebase instance not initialized in unit tests or offline fallback
     }
+    return null;
+  }
+
+  /// @deprecated Do NOT use as a Firebase UID. Use [authenticatedUserId] for Firestore operations.
+  String get userId {
+    if (authenticatedUserId != null) return authenticatedUserId!;
     final profile = HiveService.instance.userProfile;
     if (profile != null && profile.name.trim().isNotEmpty) {
       return 'user_${profile.name.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
@@ -97,6 +105,7 @@ class NotificationSyncService {
   }
 
   /// Pushes updated schedule to Firestore and updates local cache with incremented version.
+  /// When user is logged out (FirebaseAuth.currentUser == null), updates local cache ONLY and skips Firestore.
   Future<void> updateSchedule({
     required FastingSchedule schedule,
     bool incrementVersion = true,
@@ -104,31 +113,40 @@ class NotificationSyncService {
     final newVersion = incrementVersion ? localVersion + 1 : localVersion;
     final docData = buildScheduleDocument(schedule: schedule, version: newVersion);
 
-    // Update local cache immediately
+    // Update local cache immediately (offline-first guarantee)
     await HiveService.instance.saveLocalNotificationScheduleCache(docData);
+
+    final uid = authenticatedUserId;
+    if (uid == null) {
+      LoggerService.d('[FIRESTORE-SECURITY-BLOCK] reason: unauthenticated updateSchedule, requestedUid: null, authenticatedUid: null, source: NotificationSyncService');
+      return;
+    }
+
+    LoggerService.d('[FIRESTORE-USER-WRITE] uid: $uid, authUid: $uid, source: NotificationSyncService.updateSchedule, operation: update notificationSchedule');
 
     try {
       await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(uid)
           .collection('notificationSchedules')
           .doc(scheduleId)
           .set(docData, SetOptions(merge: true))
           .timeout(const Duration(seconds: 5));
 
       if (kDebugMode) {
-        debugPrint('[NotificationSyncService] Schedule updated in Firestore: Version $newVersion');
+        debugPrint('[NotificationSyncService] Schedule updated in Firestore for UID $uid: Version $newVersion');
       }
     } catch (e) {
       LoggerService.w('NotificationSyncService: Failed pushing schedule update to Firestore (saved locally): $e');
     }
 
-    await _syncScheduleToCloudflare(schedule: schedule, version: newVersion);
+    await _syncScheduleToCloudflare(schedule: schedule, version: newVersion, uid: uid);
   }
 
   Future<void> _syncScheduleToCloudflare({
     required FastingSchedule schedule,
     required int version,
+    required String uid,
   }) async {
     final enabled = HiveService.instance.getSetting<bool>('notifications_enabled') ?? true;
     final now = DateTime.now();
@@ -136,7 +154,7 @@ class NotificationSyncService {
 
     final payload = {
       'scheduleId': scheduleId,
-      'userId': userId,
+      'userId': uid,
       'enabled': enabled,
       'timezone': 'Asia/Jakarta',
       'fastHour': todaySchedule.fastHour,
@@ -178,13 +196,19 @@ class NotificationSyncService {
   Future<void> synchronizeOnStartup({
     required Future<void> Function(String reason) onRescheduleNeeded,
   }) async {
+    final uid = authenticatedUserId;
+    if (uid == null) {
+      LoggerService.d('[FIRESTORE-SECURITY-BLOCK] reason: unauthenticated synchronizeOnStartup, requestedUid: null, authenticatedUid: null, source: NotificationSyncService');
+      return;
+    }
+
     final localCache = HiveService.instance.getLocalNotificationScheduleCache();
     final localVer = localVersion;
 
     try {
       final docRef = _firestore
           .collection('users')
-          .doc(userId)
+          .doc(uid)
           .collection('notificationSchedules')
           .doc(scheduleId);
 
@@ -198,6 +222,7 @@ class NotificationSyncService {
       }
 
       final remoteData = snapshot.data()!;
+
       final remoteVer = (remoteData['version'] as num?)?.toInt() ?? 1;
 
       if (localCache == null || remoteVer > localVer) {

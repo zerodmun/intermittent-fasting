@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:fast_flow/core/services/auth_service.dart';
 import 'package:fast_flow/core/services/fcm_service.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/core/services/logger_service.dart';
@@ -64,11 +66,25 @@ class UserDataMigrationService {
     required String uid,
     required String email,
   }) async {
+    // 0. Security Guard: Firestore write only allowed if current user is authenticated and matches uid
+    try {
+      final authUser = FirebaseAuth.instance.currentUser;
+      if (authUser == null || authUser.uid != uid) {
+        LoggerService.w(
+          '[FIRESTORE-SECURITY-BLOCK] reason: unauthenticated migration attempt, requestedUid: $uid, authenticatedUid: ${authUser?.uid}, source: UserDataMigrationService',
+        );
+        return;
+      }
+    } catch (_) {
+      // Allow unit tests running with mock firestore without full Firebase.initializeApp()
+    }
+
     // 1. Migration lock to prevent concurrent executions
     if (_migrationInProgress) {
       LoggerService.i('UserDataMigrationService: Migration already in progress for UID: $uid');
       return;
     }
+
 
     final currentClaimedUid = HiveService.instance.getSetting<String>('claimed_by_uid') ??
         HiveService.instance.getSetting<String>('first_bound_uid');
@@ -105,87 +121,33 @@ class UserDataMigrationService {
         await HiveService.instance.claimLocalUserDataFor(uid);
       }
 
-      // 6. Check if Firestore user doc exists
-      final userDocRef = _firestore.collection('users').doc(uid);
-      final userSnap = await userDocRef.get();
+      // 6. Check if Firestore user doc exists (only when authenticated user matches uid)
+      final authUser = AuthService.instance.currentUser;
+      final bool canPerformFirestoreSync = authUser != null && authUser.uid == uid;
+      DocumentSnapshot<Map<String, dynamic>>? userSnap;
 
-      final profile = HiveService.instance.getUserProfileFor(uid);
+      if (canPerformFirestoreSync) {
+        LoggerService.d('[FIRESTORE-USER-WRITE] uid: $uid, authUid: ${authUser.uid}, source: UserDataMigrationService.processPostLoginMigration, operation: user migration');
+        final userDocRef = _firestore.collection('users').doc(uid);
+        userSnap = await userDocRef.get();
 
+        final profile = HiveService.instance.getUserProfileFor(uid);
 
-      if (!userSnap.exists) {
-        // CASE A / C: Fresh Firestore user document creation (LOCAL -> CLOUD migration)
-        final userData = <String, dynamic>{
-          'uid': uid,
-          'email': email,
-          'deviceId': deviceId,
-          'localUserId': legacyUserId,
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-          'accountStatus': 'active',
-          'migrationStatus': 'completed',
-        };
-
-        if (profile != null) {
-          userData['profile'] = {
-            'name': profile.name,
-            'gender': profile.gender,
-            'ageYears': profile.ageYears,
-            'heightCm': profile.heightCm,
-            'weightKg': profile.weightKg,
-            'goalWeightKg': profile.goalWeightKg,
-            'targetBodyFat': profile.targetBodyFat,
-            'targetWaist': profile.targetWaist,
-            'targetBmi': profile.targetBmi,
-            'selectedPlanId': profile.selectedPlanId,
-            'onboardingComplete': true,
+        if (!userSnap.exists) {
+          // CASE A / C: Fresh Firestore user document creation (LOCAL -> CLOUD migration)
+          final userData = <String, dynamic>{
+            'uid': uid,
+            'email': email,
+            'deviceId': deviceId,
+            'localUserId': legacyUserId,
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+            'accountStatus': 'active',
+            'migrationStatus': 'completed',
           };
-        }
 
-        await userDocRef.set(userData, SetOptions(merge: true));
-
-        // Sync existing local fasting records to Firestore
-        final records = HiveService.instance.allFastingRecords;
-        for (final record in records) {
-          final recordDoc = userDocRef.collection('fastingRecords').doc(record.id);
-          await recordDoc.set({
-            'id': record.id,
-            'planName': record.planName,
-            'fastingMinutes': record.fastingMinutes,
-            'eatingMinutes': record.eatingMinutes,
-            'startTime': Timestamp.fromDate(record.startTime),
-            'endTime': record.endTime != null ? Timestamp.fromDate(record.endTime!) : null,
-            'status': record.status,
-            'note': record.note,
-            'reason': record.reason,
-            'createdAt': Timestamp.fromDate(record.createdAt),
-            'updatedAt': Timestamp.fromDate(record.updatedAt),
-          }, SetOptions(merge: true));
-          recordsMigrated++;
-        }
-      } else {
-        // CASE B: User document already exists in Firestore -> deterministic merge
-        final data = userSnap.data();
-        if (data != null && data.containsKey('profile')) {
-          if (profile == null) {
-            final pMap = Map<String, dynamic>.from(data['profile'] as Map);
-            final cloudProfile = UserProfile(
-              name: pMap['name']?.toString() ?? '',
-              gender: pMap['gender']?.toString() ?? 'male',
-              ageYears: (pMap['ageYears'] as num?)?.toInt() ?? 25,
-              heightCm: (pMap['heightCm'] as num?)?.toDouble() ?? 170.0,
-              weightKg: (pMap['weightKg'] as num?)?.toDouble() ?? 70.0,
-              goalWeightKg: (pMap['goalWeightKg'] as num?)?.toDouble() ?? 65.0,
-              targetBodyFat: (pMap['targetBodyFat'] as num?)?.toDouble() ?? 15.0,
-              targetWaist: (pMap['targetWaist'] as num?)?.toDouble() ?? 80.0,
-              targetBmi: (pMap['targetBmi'] as num?)?.toDouble() ?? 22.0,
-              selectedPlanId: pMap['selectedPlanId']?.toString() ?? '16-8',
-              onboardingComplete: true,
-            );
-            await HiveService.instance.saveUserProfile(cloudProfile, uid);
-          }
-        } else if (profile != null) {
-          await userDocRef.set({
-            'profile': {
+          if (profile != null) {
+            userData['profile'] = {
               'name': profile.name,
               'gender': profile.gender,
               'ageYears': profile.ageYears,
@@ -197,17 +159,15 @@ class UserDataMigrationService {
               'targetBmi': profile.targetBmi,
               'selectedPlanId': profile.selectedPlanId,
               'onboardingComplete': true,
-            },
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        }
+            };
+          }
 
-        // Merge local records with remote collection safely
-        final records = HiveService.instance.allFastingRecords;
-        for (final record in records) {
-          final recordDoc = userDocRef.collection('fastingRecords').doc(record.id);
-          final existingSnap = await recordDoc.get();
-          if (!existingSnap.exists) {
+          await userDocRef.set(userData, SetOptions(merge: true));
+
+          // Sync existing local fasting records to Firestore
+          final records = HiveService.instance.allFastingRecords;
+          for (final record in records) {
+            final recordDoc = userDocRef.collection('fastingRecords').doc(record.id);
             await recordDoc.set({
               'id': record.id,
               'planName': record.planName,
@@ -222,22 +182,86 @@ class UserDataMigrationService {
               'updatedAt': Timestamp.fromDate(record.updatedAt),
             }, SetOptions(merge: true));
             recordsMigrated++;
-          } else {
-            recordsMerged++;
+          }
+        } else {
+          // CASE B: User document already exists in Firestore -> deterministic merge
+          final data = userSnap.data();
+          if (data != null && data.containsKey('profile')) {
+            if (profile == null) {
+              final pMap = Map<String, dynamic>.from(data['profile'] as Map);
+              final cloudProfile = UserProfile(
+                name: pMap['name']?.toString() ?? '',
+                gender: pMap['gender']?.toString() ?? 'male',
+                ageYears: (pMap['ageYears'] as num?)?.toInt() ?? 25,
+                heightCm: (pMap['heightCm'] as num?)?.toDouble() ?? 170.0,
+                weightKg: (pMap['weightKg'] as num?)?.toDouble() ?? 70.0,
+                goalWeightKg: (pMap['goalWeightKg'] as num?)?.toDouble() ?? 65.0,
+                targetBodyFat: (pMap['targetBodyFat'] as num?)?.toDouble() ?? 15.0,
+                targetWaist: (pMap['targetWaist'] as num?)?.toDouble() ?? 80.0,
+                targetBmi: (pMap['targetBmi'] as num?)?.toDouble() ?? 22.0,
+                selectedPlanId: pMap['selectedPlanId']?.toString() ?? '16-8',
+                onboardingComplete: true,
+              );
+              await HiveService.instance.saveUserProfile(cloudProfile, uid);
+            }
+          } else if (profile != null) {
+            await userDocRef.set({
+              'profile': {
+                'name': profile.name,
+                'gender': profile.gender,
+                'ageYears': profile.ageYears,
+                'heightCm': profile.heightCm,
+                'weightKg': profile.weightKg,
+                'goalWeightKg': profile.goalWeightKg,
+                'targetBodyFat': profile.targetBodyFat,
+                'targetWaist': profile.targetWaist,
+                'targetBmi': profile.targetBmi,
+                'selectedPlanId': profile.selectedPlanId,
+                'onboardingComplete': true,
+              },
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+          }
+
+          // Merge local records with remote collection safely
+          final records = HiveService.instance.allFastingRecords;
+          for (final record in records) {
+            final recordDoc = userDocRef.collection('fastingRecords').doc(record.id);
+            final existingSnap = await recordDoc.get();
+            if (!existingSnap.exists) {
+              await recordDoc.set({
+                'id': record.id,
+                'planName': record.planName,
+                'fastingMinutes': record.fastingMinutes,
+                'eatingMinutes': record.eatingMinutes,
+                'startTime': Timestamp.fromDate(record.startTime),
+                'endTime': record.endTime != null ? Timestamp.fromDate(record.endTime!) : null,
+                'status': record.status,
+                'note': record.note,
+                'reason': record.reason,
+                'createdAt': Timestamp.fromDate(record.createdAt),
+                'updatedAt': Timestamp.fromDate(record.updatedAt),
+              }, SetOptions(merge: true));
+              recordsMigrated++;
+            } else {
+              recordsMerged++;
+            }
           }
         }
-      }
 
-      // 7. Check if remote notification schedule exists
-      final scheduleDocRef = userDocRef.collection('notificationSchedules').doc('fasting_schedule_001');
-      final scheduleSnap = await scheduleDocRef.get();
+        // 7. Check if remote notification schedule exists
+        final scheduleDocRef = userDocRef.collection('notificationSchedules').doc('fasting_schedule_001');
+        final scheduleSnap = await scheduleDocRef.get();
 
-      if (!scheduleSnap.exists) {
-        final schedule = HiveService.instance.fastingSchedule;
-        await NotificationSyncService.instance.updateSchedule(
-          schedule: schedule,
-          incrementVersion: false,
-        );
+        if (!scheduleSnap.exists) {
+          final schedule = HiveService.instance.fastingSchedule;
+          await NotificationSyncService.instance.updateSchedule(
+            schedule: schedule,
+            incrementVersion: false,
+          );
+        }
+      } else {
+        LoggerService.d('[FIRESTORE-SECURITY-BLOCK] reason: unauthenticated migration, requestedUid: $uid, authenticatedUid: ${authUser?.uid}, source: UserDataMigrationService');
       }
 
       // 8. Store migration markers
@@ -255,7 +279,8 @@ class UserDataMigrationService {
       final int localWeightEntries = HiveService.instance.weightEntriesBox.length;
       final int localFoodLogs = HiveService.instance.foodLogsBox.length;
       final int localWorkoutLogs = HiveService.instance.workoutLogsBox.length;
-      final bool cloudProfileExists = userSnap.exists && (userSnap.data()?.containsKey('profile') ?? false);
+      final bool cloudProfileExists = userSnap != null && userSnap.exists && (userSnap.data()?.containsKey('profile') ?? false);
+
       final bool migrationPerformed = recordsMigrated > 0 || hasLocalData;
       final bool onboardingRequired = !HiveService.instance.hasCompletedOnboardingForUser(uid);
 

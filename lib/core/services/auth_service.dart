@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:fast_flow/core/services/fcm_service.dart';
 import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/core/services/logger_service.dart';
+import 'package:fast_flow/core/services/notification_service.dart';
 import 'package:fast_flow/core/services/notification_sync_service.dart';
 import 'package:fast_flow/core/services/user_data_migration_service.dart';
 
@@ -87,6 +88,16 @@ class AuthService {
     required String uid,
     required String deviceId,
   }) async {
+    final authUser = currentUser;
+    if (authUser == null || authUser.uid != uid) {
+      LoggerService.w(
+        '[FIRESTORE-SECURITY-BLOCK] reason: unauthenticated device transfer, requestedUid: $uid, authenticatedUid: ${authUser?.uid}, source: AuthService._transferDeviceBinding',
+      );
+      return;
+    }
+
+    LoggerService.d('[FIRESTORE-USER-WRITE] uid: $uid, authUid: ${authUser.uid}, source: AuthService._transferDeviceBinding, operation: transfer device binding');
+
     try {
       final query = await _firestore
           .collection('users')
@@ -134,6 +145,16 @@ class AuthService {
     required String uid,
     required String deviceId,
   }) async {
+    final authUser = currentUser;
+    if (authUser == null || authUser.uid != uid) {
+      LoggerService.w(
+        '[FIRESTORE-SECURITY-BLOCK] reason: unauthenticated device unbind, requestedUid: $uid, authenticatedUid: ${authUser?.uid}, source: AuthService._unbindDeviceFromUser',
+      );
+      return;
+    }
+
+    LoggerService.d('[FIRESTORE-USER-WRITE] uid: $uid, authUid: ${authUser.uid}, source: AuthService._unbindDeviceFromUser, operation: unbind device');
+
     try {
       final userDocRef = _firestore.collection('users').doc(uid);
       await userDocRef.set({
@@ -164,6 +185,7 @@ class AuthService {
     );
     final user = userCredential.user;
     if (user != null) {
+      LoggerService.d('[FIRESTORE-USER-WRITE] uid: ${user.uid}, authUid: ${user.uid}, source: AuthService.signUpWithEmail, operation: create user document');
       await _transferDeviceBinding(uid: user.uid, deviceId: deviceId);
 
       final userDocRef = _firestore.collection('users').doc(user.uid);
@@ -175,6 +197,7 @@ class AuthService {
         'updatedAt': FieldValue.serverTimestamp(),
         'accountStatus': 'active',
       }, SetOptions(merge: true));
+
 
       await UserDataMigrationService.instance.processPostLoginMigration(
         uid: user.uid,
@@ -263,21 +286,29 @@ class AuthService {
     await HiveService.instance.setSetting('bound_firebase_uid', null);
     await HiveService.instance.setSetting('migration_status', 'legacy_local_user');
 
-
-    await _resyncServicesAfterAuthChange();
+    // Local notifications only: do NOT run cloud synchronization when signed out
+    try {
+      NotificationService.instance.scheduleReminderNotifications('Auth Sign Out');
+    } catch (_) {}
   }
 
   /// Helper to trigger notification schedule update and FCM re-registration after auth state changes
   Future<void> _resyncServicesAfterAuthChange() async {
     try {
-      final schedule = HiveService.instance.fastingSchedule;
-      await NotificationSyncService.instance.updateSchedule(
-        schedule: schedule,
-        incrementVersion: true,
-      );
-      await FcmService.instance.reRegisterToken();
+      final user = currentUser;
+      if (user != null) {
+        final schedule = HiveService.instance.fastingSchedule;
+        await NotificationSyncService.instance.updateSchedule(
+          schedule: schedule,
+          incrementVersion: true,
+        );
+        await FcmService.instance.reRegisterToken();
+      } else {
+        NotificationService.instance.scheduleReminderNotifications('Auth State Change (Logged Out)');
+      }
     } catch (e) {
       LoggerService.w('AuthService: Error re-syncing services after auth change: $e');
     }
   }
 }
+

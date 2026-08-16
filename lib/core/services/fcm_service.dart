@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -162,11 +163,18 @@ class FcmService {
   }
 
   Future<void> _updateTokenInFirestore(String token) async {
-    final userId = NotificationSyncService.instance.userId;
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null || authUser.uid.isEmpty) {
+      LoggerService.d('[FIRESTORE-SECURITY-BLOCK] reason: unauthenticated FCM token update, requestedUid: null, authenticatedUid: null, source: FcmService');
+      return;
+    }
+    final userId = authUser.uid;
     var deviceId = getOrCreateDeviceId();
 
+    LoggerService.d('[FIRESTORE-USER-WRITE] uid: $userId, authUid: ${authUser.uid}, source: FcmService._updateTokenInFirestore, operation: register device');
+
     // ignore: avoid_print
-    print('[FCM-DIAG] Registering device: $deviceId');
+    print('[FCM-DIAG] Registering device: $deviceId for UID: $userId');
 
     try {
       // Protection against duplicate device records with the same FCM token for this user
@@ -219,7 +227,7 @@ class FcmService {
         debugPrint('[FCM] FCM token saved to Firestore for device: $deviceId');
       }
 
-      await _syncDeviceToCloudflare(token);
+      await _syncDeviceToCloudflare(token, userId);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[FCM] Failed updating FCM token in Firestore: $e');
@@ -227,8 +235,7 @@ class FcmService {
     }
   }
 
-  Future<void> _syncDeviceToCloudflare(String token) async {
-    final userId = NotificationSyncService.instance.userId;
+  Future<void> _syncDeviceToCloudflare(String token, String userId) async {
     final deviceId = getOrCreateDeviceId();
 
     final payload = {
@@ -258,6 +265,7 @@ class FcmService {
         }
       }
     } catch (e) {
+
       if (kDebugMode) {
         debugPrint('[FcmService] Cloudflare Worker device sync error for device $deviceId: $e');
       }
