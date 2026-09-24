@@ -10,7 +10,9 @@ import 'package:fast_flow/core/services/logger_service.dart';
 import 'package:fast_flow/core/services/notification_service.dart';
 import 'package:fast_flow/core/services/notification_sync_service.dart';
 import 'package:fast_flow/features/fasting/data/services/fasting_engine.dart';
+import 'package:fast_flow/features/fasting/domain/entities/fasting_record.dart';
 import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
+import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
 
 class AccountSwitchConflictException implements Exception {
   final String message;
@@ -31,7 +33,7 @@ class UserDataMigrationService {
   bool _migrationInProgress = false;
 
   @visibleForTesting
-  void setMockFirestore(FirebaseFirestore firestore) {
+  void setMockFirestore(FirebaseFirestore? firestore) {
     _customFirestore = firestore;
   }
 
@@ -107,6 +109,8 @@ class UserDataMigrationService {
 
     int recordsMigrated = 0;
     int recordsMerged = 0;
+    int weightLogsMigrated = 0;
+    int weightLogsMerged = 0;
 
     // 3. Register known account
     await HiveService.instance.registerKnownAccount(uid: uid, email: email);
@@ -116,12 +120,7 @@ class UserDataMigrationService {
     await HiveService.instance.setSetting('bound_firebase_uid', uid);
 
     try {
-      // 5. Claim unclaimed legacy local data if this is the FIRST account on a device with local data
-      if (HiveService.instance.hasUnclaimedLocalUserData()) {
-        await HiveService.instance.claimLocalUserDataFor(uid);
-      }
-
-      // 6. Check if Firestore user doc exists (only when authenticated user matches uid)
+      // 5. Check if Firestore user doc exists (only when authenticated user matches uid)
       final authUser = AuthService.instance.currentUser;
       final bool canPerformFirestoreSync = authUser != null && authUser.uid == uid;
       DocumentSnapshot<Map<String, dynamic>>? userSnap;
@@ -131,134 +130,261 @@ class UserDataMigrationService {
         final userDocRef = _firestore.collection('users').doc(uid);
         userSnap = await userDocRef.get();
 
-        final profile = HiveService.instance.getUserProfileFor(uid);
-
-        if (!userSnap.exists) {
-          // CASE A / C: Fresh Firestore user document creation (LOCAL -> CLOUD migration)
-          final userData = <String, dynamic>{
-            'uid': uid,
-            'email': email,
-            'deviceId': deviceId,
-            'localUserId': legacyUserId,
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-            'accountStatus': 'active',
-            'migrationStatus': 'completed',
-          };
-
-          if (profile != null) {
-            userData['profile'] = {
-              'name': profile.name,
-              'gender': profile.gender,
-              'ageYears': profile.ageYears,
-              'heightCm': profile.heightCm,
-              'weightKg': profile.weightKg,
-              'goalWeightKg': profile.goalWeightKg,
-              'targetBodyFat': profile.targetBodyFat,
-              'targetWaist': profile.targetWaist,
-              'targetBmi': profile.targetBmi,
-              'selectedPlanId': profile.selectedPlanId,
-              'onboardingComplete': true,
-            };
-          }
-
-          await userDocRef.set(userData, SetOptions(merge: true));
-
-          // Sync existing local fasting records to Firestore
-          final records = HiveService.instance.allFastingRecords;
-          for (final record in records) {
-            final recordDoc = userDocRef.collection('fastingRecords').doc(record.id);
-            await recordDoc.set({
-              'id': record.id,
-              'planName': record.planName,
-              'fastingMinutes': record.fastingMinutes,
-              'eatingMinutes': record.eatingMinutes,
-              'startTime': Timestamp.fromDate(record.startTime),
-              'endTime': record.endTime != null ? Timestamp.fromDate(record.endTime!) : null,
-              'status': record.status,
-              'note': record.note,
-              'reason': record.reason,
-              'createdAt': Timestamp.fromDate(record.createdAt),
-              'updatedAt': Timestamp.fromDate(record.updatedAt),
-            }, SetOptions(merge: true));
-            recordsMigrated++;
-          }
-        } else {
-          // CASE B: User document already exists in Firestore -> deterministic merge
+        if (userSnap.exists) {
+          // CASE 1: Firestore doc exists -> HYDRATE FROM FIRESTORE (Authoritative source)
           final data = userSnap.data();
           if (data != null && data.containsKey('profile')) {
-            if (profile == null) {
-              final pMap = Map<String, dynamic>.from(data['profile'] as Map);
-              final cloudProfile = UserProfile(
-                name: pMap['name']?.toString() ?? '',
-                gender: pMap['gender']?.toString() ?? 'male',
-                ageYears: (pMap['ageYears'] as num?)?.toInt() ?? 25,
-                heightCm: (pMap['heightCm'] as num?)?.toDouble() ?? 170.0,
-                weightKg: (pMap['weightKg'] as num?)?.toDouble() ?? 70.0,
-                goalWeightKg: (pMap['goalWeightKg'] as num?)?.toDouble() ?? 65.0,
-                targetBodyFat: (pMap['targetBodyFat'] as num?)?.toDouble() ?? 15.0,
-                targetWaist: (pMap['targetWaist'] as num?)?.toDouble() ?? 80.0,
-                targetBmi: (pMap['targetBmi'] as num?)?.toDouble() ?? 22.0,
-                selectedPlanId: pMap['selectedPlanId']?.toString() ?? '16-8',
-                onboardingComplete: true,
-              );
-              await HiveService.instance.saveUserProfile(cloudProfile, uid);
-            }
-          } else if (profile != null) {
-            await userDocRef.set({
-              'profile': {
-                'name': profile.name,
-                'gender': profile.gender,
-                'ageYears': profile.ageYears,
-                'heightCm': profile.heightCm,
-                'weightKg': profile.weightKg,
-                'goalWeightKg': profile.goalWeightKg,
-                'targetBodyFat': profile.targetBodyFat,
-                'targetWaist': profile.targetWaist,
-                'targetBmi': profile.targetBmi,
-                'selectedPlanId': profile.selectedPlanId,
-                'onboardingComplete': true,
-              },
-              'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
+            final pMap = Map<String, dynamic>.from(data['profile'] as Map);
+            final name = pMap['name']?.toString() ?? '';
+            final gender = pMap['gender']?.toString() ?? 'male';
+            final ageYears = (pMap['ageYears'] as num?)?.toInt() ?? 25;
+            final heightCm = (pMap['heightCm'] as num?)?.toDouble() ?? 170.0;
+            final weightKg = (pMap['weightKg'] as num?)?.toDouble() ?? 70.0;
+            final goalWeightKg = (pMap['goalWeightKg'] as num?)?.toDouble() ?? 65.0;
+            final targetBodyFat = (pMap['targetBodyFat'] as num?)?.toDouble() ?? 15.0;
+            final targetWaist = (pMap['targetWaist'] as num?)?.toDouble() ?? 80.0;
+            final targetBmi = (pMap['targetBmi'] as num?)?.toDouble() ?? 22.0;
+            final selectedPlanId = pMap['selectedPlanId']?.toString() ?? '16-8';
+            final bool isComplete = (pMap['onboardingComplete'] as bool?) ??
+                (name.trim().isNotEmpty && ageYears > 0 && heightCm > 0 && weightKg > 0);
+
+            final cloudProfile = UserProfile(
+              name: name,
+              gender: gender,
+              ageYears: ageYears,
+              heightCm: heightCm,
+              weightKg: weightKg,
+              goalWeightKg: goalWeightKg,
+              targetBodyFat: targetBodyFat,
+              targetWaist: targetWaist,
+              targetBmi: targetBmi,
+              selectedPlanId: selectedPlanId,
+              onboardingComplete: isComplete,
+            );
+            await HiveService.instance.saveUserProfile(cloudProfile, uid);
           }
 
-          // Merge local records with remote collection safely
-          final records = HiveService.instance.allFastingRecords;
-          for (final record in records) {
-            final recordDoc = userDocRef.collection('fastingRecords').doc(record.id);
-            final existingSnap = await recordDoc.get();
-            if (!existingSnap.exists) {
+          // Restore remote fasting records into local Hive
+          try {
+            final deletedFastingSessions = (HiveService.instance.settingsBox.get('deleted_sessions') as List?)
+                ?.map((e) => e.toString())
+                .toSet() ?? <String>{};
+            final recordsSnap = await userDocRef.collection('fastingRecords').get();
+            for (final doc in recordsSnap.docs) {
+              final rData = doc.data();
+              final isDeleted = rData['isDeleted'] == true;
+              final recordId = rData['recordId']?.toString() ?? rData['id']?.toString() ?? doc.id;
+
+              if (isDeleted || deletedFastingSessions.contains(recordId)) {
+                if (!isDeleted && deletedFastingSessions.contains(recordId)) {
+                  // Propagate local offline deletion to Firestore
+                  await userDocRef.collection('fastingRecords').doc(recordId).set({
+                    'recordId': recordId,
+                    'isDeleted': true,
+                    'updatedAt': FieldValue.serverTimestamp(),
+                    'syncedAt': FieldValue.serverTimestamp(),
+                  }, SetOptions(merge: true));
+                }
+                await HiveService.instance.fastingRecordsBox.delete(recordId);
+                continue;
+              }
+
+              DateTime? parseDate(dynamic val) {
+                if (val is Timestamp) return val.toDate().toLocal();
+                if (val is String) {
+                  final parsed = DateTime.tryParse(val);
+                  return parsed?.toLocal();
+                }
+                return null;
+              }
+
+              final sTime = parseDate(rData['fastingStartAt']) ?? parseDate(rData['startTime']) ?? DateTime.now();
+              final eTime = parseDate(rData['fastingEndAt']) ?? parseDate(rData['endTime']);
+              final fMinutes = (rData['duration'] as num?)?.toInt() ??
+                  (rData['fastingMinutes'] as num?)?.toInt() ??
+                  (eTime != null ? eTime.difference(sTime).inMinutes : 960);
+              final eMinutes = (rData['eatingMinutes'] as num?)?.toInt() ?? (24 * 60 - fMinutes);
+              final updatedAt = parseDate(rData['updatedAt']) ?? DateTime.now();
+              final createdAt = parseDate(rData['createdAt']) ?? sTime;
+
+              // Last-Write-Wins conflict check against local Hive (UTC normalized)
+              final existingLocal = HiveService.instance.fastingRecordsBox.get(recordId);
+              if (existingLocal != null && existingLocal.updatedAt.toUtc().isAfter(updatedAt.toUtc())) {
+                LoggerService.d('[HYDRATION-CONFLICT-SKIP] Stale remote record $recordId ignored (local newer: ${existingLocal.updatedAt.toUtc()} > remote: ${updatedAt.toUtc()})');
+                continue;
+              }
+
+              final record = FastingRecord(
+                id: recordId,
+                planName: rData['planName']?.toString() ?? '16:8',
+                fastingMinutes: fMinutes,
+                eatingMinutes: eMinutes,
+                startTime: sTime,
+                endTime: eTime,
+                status: rData['status']?.toString() ?? 'completed',
+                note: rData['note']?.toString(),
+                reason: rData['reason']?.toString(),
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              );
+              await HiveService.instance.fastingRecordsBox.put(record.id, record);
+              recordsMerged++;
+            }
+          } catch (e) {
+            LoggerService.w('UserDataMigrationService: Fasting records restore note: $e');
+          }
+
+          // Restore remote weight logs into local Hive
+          try {
+            final deletedWeightLogs = (HiveService.instance.settingsBox.get('deleted_weight_logs') as List?)
+                ?.map((e) => e.toString())
+                .toSet() ?? <String>{};
+            final weightLogsSnap = await userDocRef.collection('weightLogs').get();
+            final remoteLogIds = <String>{};
+
+            for (final doc in weightLogsSnap.docs) {
+              final wData = doc.data();
+              final isDeleted = wData['isDeleted'] == true;
+              final logId = wData['id']?.toString() ?? doc.id;
+              remoteLogIds.add(logId);
+
+              if (isDeleted || deletedWeightLogs.contains(logId)) {
+                if (!isDeleted && deletedWeightLogs.contains(logId)) {
+                  // Propagate local offline deletion to Firestore
+                  await userDocRef.collection('weightLogs').doc(logId).set({
+                    'id': logId,
+                    'isDeleted': true,
+                    'updatedAt': FieldValue.serverTimestamp(),
+                    'syncedAt': FieldValue.serverTimestamp(),
+                  }, SetOptions(merge: true));
+                }
+                await HiveService.instance.weightEntriesBox.delete(logId);
+                continue;
+              }
+
+              DateTime? parseDate(dynamic val) {
+                if (val is Timestamp) return val.toDate().toLocal();
+                if (val is String) {
+                  final parsed = DateTime.tryParse(val);
+                  return parsed?.toLocal();
+                }
+                if (val is int) {
+                  return DateTime.fromMillisecondsSinceEpoch(val).toLocal();
+                }
+                return null;
+              }
+
+              final updatedAt = parseDate(wData['updatedAt']) ?? DateTime.now();
+
+              // Last-Write-Wins conflict check against local Hive (UTC normalized)
+              final existingLocal = HiveService.instance.weightEntriesBox.get(logId);
+              if (existingLocal != null && existingLocal.updatedAt.toUtc().isAfter(updatedAt.toUtc())) {
+                LoggerService.d('[HYDRATION-CONFLICT-SKIP] Stale remote weight log $logId ignored (local newer: ${existingLocal.updatedAt.toUtc()} > remote: ${updatedAt.toUtc()})');
+                // Upload the newer local entry to cloud
+                await userDocRef.collection('weightLogs').doc(logId).set(
+                  existingLocal.toFirestore(),
+                  SetOptions(merge: true),
+                );
+                continue;
+              }
+
+              final entry = WeightEntry.fromFirestore(wData, doc.id);
+              await HiveService.instance.weightEntriesBox.put(entry.id, entry);
+              weightLogsMerged++;
+            }
+
+            // Sync any local weight entries that were created offline and don't exist in remote
+            final localEntries = HiveService.instance.allWeightEntries;
+            for (final entry in localEntries) {
+              if (!remoteLogIds.contains(entry.id)) {
+                await userDocRef.collection('weightLogs').doc(entry.id).set(
+                  entry.toFirestore(),
+                  SetOptions(merge: true),
+                );
+              }
+            }
+          } catch (e) {
+            LoggerService.w('UserDataMigrationService: Weight logs restore note: $e');
+          }
+
+          // Check remote notification schedule
+          try {
+            final scheduleDocRef = userDocRef.collection('notificationSchedules').doc('fasting_schedule_001');
+            final scheduleSnap = await scheduleDocRef.get();
+            if (!scheduleSnap.exists) {
+              final schedule = HiveService.instance.fastingSchedule;
+              await NotificationSyncService.instance.updateSchedule(
+                schedule: schedule,
+                incrementVersion: false,
+              );
+            }
+          } catch (_) {}
+        } else {
+          // CASE 2: Firestore doc does NOT exist -> New user or first-time local-to-cloud sync
+          if (HiveService.instance.hasUnclaimedLocalUserData()) {
+            await HiveService.instance.claimLocalUserDataFor(uid);
+            final claimedProfile = HiveService.instance.getUserProfileFor(uid);
+
+            final userData = <String, dynamic>{
+              'uid': uid,
+              'email': email,
+              'deviceId': deviceId,
+              'localUserId': legacyUserId,
+              'createdAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+              'accountStatus': 'active',
+              'migrationStatus': 'completed',
+            };
+
+            if (claimedProfile != null) {
+              userData['profile'] = {
+                'name': claimedProfile.name,
+                'gender': claimedProfile.gender,
+                'ageYears': claimedProfile.ageYears,
+                'heightCm': claimedProfile.heightCm,
+                'weightKg': claimedProfile.weightKg,
+                'goalWeightKg': claimedProfile.goalWeightKg,
+                'targetBodyFat': claimedProfile.targetBodyFat,
+                'targetWaist': claimedProfile.targetWaist,
+                'targetBmi': claimedProfile.targetBmi,
+                'selectedPlanId': claimedProfile.selectedPlanId,
+                'onboardingComplete': true,
+              };
+            }
+
+            await userDocRef.set(userData, SetOptions(merge: true));
+
+            // Sync local fasting records to Firestore using canonical schema
+            final records = HiveService.instance.allFastingRecords;
+            for (final record in records) {
+              final recordDoc = userDocRef.collection('fastingRecords').doc(record.id);
               await recordDoc.set({
-                'id': record.id,
-                'planName': record.planName,
-                'fastingMinutes': record.fastingMinutes,
+                'recordId': record.id,
+                'fastingStartAt': Timestamp.fromDate(record.startTime.toUtc()),
+                'fastingEndAt': record.endTime != null ? Timestamp.fromDate(record.endTime!.toUtc()) : null,
+                'duration': record.fastingMinutes,
                 'eatingMinutes': record.eatingMinutes,
-                'startTime': Timestamp.fromDate(record.startTime),
-                'endTime': record.endTime != null ? Timestamp.fromDate(record.endTime!) : null,
+                'planName': record.planName,
                 'status': record.status,
                 'note': record.note,
                 'reason': record.reason,
-                'createdAt': Timestamp.fromDate(record.createdAt),
-                'updatedAt': Timestamp.fromDate(record.updatedAt),
+                'createdAt': Timestamp.fromDate(record.createdAt.toUtc()),
+                'updatedAt': Timestamp.fromDate(record.updatedAt.toUtc()),
+                'syncedAt': FieldValue.serverTimestamp(),
+                'isDeleted': false,
+                'syncStatus': 'synced',
               }, SetOptions(merge: true));
               recordsMigrated++;
-            } else {
-              recordsMerged++;
+            }
+
+            // Sync local weight logs to Firestore
+            final weightEntries = HiveService.instance.allWeightEntries;
+            for (final entry in weightEntries) {
+              final weightDoc = userDocRef.collection('weightLogs').doc(entry.id);
+              await weightDoc.set(entry.toFirestore(), SetOptions(merge: true));
+              weightLogsMigrated++;
             }
           }
-        }
-
-        // 7. Check if remote notification schedule exists
-        final scheduleDocRef = userDocRef.collection('notificationSchedules').doc('fasting_schedule_001');
-        final scheduleSnap = await scheduleDocRef.get();
-
-        if (!scheduleSnap.exists) {
-          final schedule = HiveService.instance.fastingSchedule;
-          await NotificationSyncService.instance.updateSchedule(
-            schedule: schedule,
-            incrementVersion: false,
-          );
         }
       } else {
         LoggerService.d('[FIRESTORE-SECURITY-BLOCK] reason: unauthenticated migration, requestedUid: $uid, authenticatedUid: ${authUser?.uid}, source: UserDataMigrationService');
@@ -281,7 +407,7 @@ class UserDataMigrationService {
       final int localWorkoutLogs = HiveService.instance.workoutLogsBox.length;
       final bool cloudProfileExists = userSnap != null && userSnap.exists && (userSnap.data()?.containsKey('profile') ?? false);
 
-      final bool migrationPerformed = recordsMigrated > 0 || hasLocalData;
+      final bool migrationPerformed = recordsMigrated > 0 || weightLogsMigrated > 0 || hasLocalData;
       final bool onboardingRequired = !HiveService.instance.hasCompletedOnboardingForUser(uid);
 
       LoggerService.i(
@@ -295,7 +421,8 @@ class UserDataMigrationService {
         'localFoodLogs: $localFoodLogs\n'
         'localWorkoutLogs: $localWorkoutLogs\n\n'
         'cloudProfileExists: $cloudProfileExists\n'
-        'cloudFastingRecords: $recordsMerged\n\n'
+        'cloudFastingRecords: $recordsMerged\n'
+        'cloudWeightLogs: $weightLogsMerged\n\n'
         'migrationAlreadyCompleted: ${currentStatus == 'completed'}\n'
         'migrationPerformed: $migrationPerformed\n\n'
         'claimedByUid: $uid\n'

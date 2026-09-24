@@ -43,6 +43,9 @@ class FastingEngine {
     }
   }
 
+  StreamSubscription? _scheduleSubscription;
+  StreamSubscription? _recordsSubscription;
+
   void initialize() {
     if (_isInitialized) return;
     _isInitialized = true;
@@ -52,12 +55,14 @@ class FastingEngine {
     StartupDiag.log('FastingEngine initialized');
 
     // Reactively watch schedule updates to clear cache and recalculate active sessions
-    HiveService.instance.fastingScheduleBox.watch(key: 'schedule').listen((_) {
+    _scheduleSubscription?.cancel();
+    _scheduleSubscription = HiveService.instance.fastingScheduleBox.watch().listen((_) {
       onScheduleChanged();
     });
 
     // Reactively watch record changes (add, update, delete) to update elapsed/remaining/progress
-    HiveService.instance.fastingRecordsBox.watch().listen((_) {
+    _recordsSubscription?.cancel();
+    _recordsSubscription = HiveService.instance.fastingRecordsBox.watch().listen((_) {
       onRecordChanged();
     });
   }
@@ -149,6 +154,7 @@ class FastingEngine {
         if (!_isInitialized) return null;
         return getRecordForSession(start);
       },
+      isCancelled: () => !_isInitialized,
     );
   }
 
@@ -188,6 +194,10 @@ class FastingEngine {
   void dispose() {
     _timer?.cancel();
     _timer = null;
+    _scheduleSubscription?.cancel();
+    _scheduleSubscription = null;
+    _recordsSubscription?.cancel();
+    _recordsSubscription = null;
     _listeners.clear();
     _isInitialized = false;
   }

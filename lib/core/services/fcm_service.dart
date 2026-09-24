@@ -51,10 +51,26 @@ class FcmService {
   static final FcmService instance = FcmService._();
 
   FirebaseMessaging? _customMessaging;
-  FirebaseMessaging get _messaging => _customMessaging ?? FirebaseMessaging.instance;
+  FirebaseMessaging get messaging => _customMessaging ?? FirebaseMessaging.instance;
+  FirebaseMessaging get _messaging => messaging;
   FirebaseFirestore? _customFirestore;
   FirebaseFirestore get _firestore => _customFirestore ?? FirebaseFirestore.instance;
   bool _initialized = false;
+
+  @visibleForTesting
+  void setMockInstances({FirebaseMessaging? messaging, FirebaseFirestore? firestore}) {
+    _customMessaging = messaging;
+    _customFirestore = firestore;
+  }
+
+  /// Gets current FCM registration token safely
+  Future<String?> getFcmToken() async {
+    try {
+      return await _messaging.getToken();
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Builds standardized device document payload for Firestore
   Map<String, dynamic> buildDeviceDocument({

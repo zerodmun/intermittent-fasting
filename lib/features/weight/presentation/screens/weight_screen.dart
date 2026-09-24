@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:fast_flow/core/constants/app_spacing.dart';
 import 'package:fast_flow/core/extensions/context_extensions.dart';
+import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
@@ -323,8 +324,11 @@ class WeightScreen extends ConsumerWidget {
                     hipCm: existing?.hipCm,
                   );
 
+                  final uid = HiveService.instance.currentActiveUserId;
+                  final newId = uid.isNotEmpty ? '${uid}_${const Uuid().v4()}' : const Uuid().v4();
+
                   final entry = WeightEntry(
-                    id: existing?.id ?? const Uuid().v4(),
+                    id: existing?.id ?? newId,
                     weightKg: weight,
                     date: existing?.date ?? DateTime.now(),
                     bodyFatPercentage: compResult.bodyFatPercentage,

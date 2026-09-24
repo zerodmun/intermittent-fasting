@@ -75,7 +75,8 @@ void main() {
         await HiveService.instance.saveFastingRecord(rec);
       }
 
-      // Login Account A
+      // Login Account A (claims unclaimed local data for the first bound account)
+      await HiveService.instance.claimLocalUserDataFor('uid_account_A');
       await HiveService.instance.setSetting('bound_firebase_uid', 'uid_account_A');
 
       final profileA = HiveService.instance.userProfile;

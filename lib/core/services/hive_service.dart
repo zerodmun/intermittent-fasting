@@ -10,6 +10,8 @@ import 'package:fast_flow/features/onboarding/domain/entities/user_profile.dart'
 import 'package:fast_flow/features/weight/domain/entities/weight_entry.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fast_flow/core/services/auth_service.dart';
 import 'package:fast_flow/core/services/notification_sync_service.dart';
 import 'package:fast_flow/core/services/fcm_service.dart';
 
@@ -44,6 +46,12 @@ class HiveService {
   late Box workoutLogsBox;
   late Box notificationScheduleCacheBox;
   late Box processedEventsBox;
+
+  FirebaseFirestore? _customFirestore;
+
+  void setMockFirestore(FirebaseFirestore? firestore) {
+    _customFirestore = firestore;
+  }
 
   /// Initialize Hive and open all boxes safely
   Future<void> init() async {
@@ -222,21 +230,21 @@ class HiveService {
       final userProf = userProfileBox.get('profile_$targetUid');
       if (userProf != null) return userProf;
 
-      // 2. Fallback check for first bound UID or local user
-      final firstBoundUid = getSetting<String>('first_bound_uid');
-      if (firstBoundUid == null || firstBoundUid == targetUid || targetUid == localUserId) {
+      // 2. Fallback check ONLY for guest / local anonymous user, or explicitly claimed legacy owner
+      if (targetUid == localUserId) {
+        return userProfileBox.get('profile');
+      }
+
+      final claimedOwnerUid = getSetting<String>('claimed_by_uid') ?? getSetting<String>('first_bound_uid');
+      if (claimedOwnerUid != null && claimedOwnerUid == targetUid) {
         final legacyProf = userProfileBox.get('profile');
         if (legacyProf != null) {
           final cloned = legacyProf.copyWith();
           userProfileBox.put('profile_$targetUid', cloned);
-          if (firstBoundUid == null && targetUid != localUserId) {
-            setSetting('first_bound_uid', targetUid);
-            setSetting('legacy_data_claimed', true);
-            setSetting('legacy_data_owner_uid', targetUid);
-          }
           return cloned;
         }
       }
+
       return null;
     } catch (_) {
       return null;
@@ -246,22 +254,17 @@ class HiveService {
   UserProfile? get userProfile => getUserProfileFor();
 
   /// Checks whether the specified user (or current active user) has completed onboarding.
-  /// Returns true if:
-  /// 1. User has an existing profile with onboardingComplete == true, OR
-  /// 2. Current user has no profile yet, but there is unclaimed local data on this device
-  ///    (which will be claimed during local-to-cloud migration).
   bool hasCompletedOnboardingForUser([String? uid]) {
     final targetUid = uid ?? currentActiveUserId;
 
-    // 1. Check if targetUid already has its own profile
+    // 1. Check if targetUid already has its own completed profile
     final prof = getUserProfileFor(targetUid);
     if (prof != null && prof.onboardingComplete) {
       return true;
     }
 
-    // 2. If targetUid has no profile yet, but unclaimed legacy local data exists,
-    // this first account will claim the local data -> skip onboarding!
-    if (hasUnclaimedLocalUserData()) {
+    // 2. If guest/local user, check if unclaimed local data exists
+    if (targetUid == localUserId && hasUnclaimedLocalUserData()) {
       return true;
     }
 
@@ -590,20 +593,73 @@ class HiveService {
   List<FastingRecord> get allFastingRecords {
     final uid = currentActiveUserId;
     final firstBoundUid = getSetting<String>('first_bound_uid');
+    final accounts = knownAccounts.map((a) => a['uid']).whereType<String>().toSet();
 
     final all = fastingRecordsBox.values.toList();
     return all.where((record) {
-      if (record.id.contains(uid)) return true;
+      if (record.id.startsWith('${uid}_') || record.id.contains(uid)) return true;
+      for (final otherUid in accounts) {
+        if (otherUid != uid && (record.id.startsWith('${otherUid}_') || record.id.contains(otherUid))) {
+          return false;
+        }
+      }
       if (!record.id.contains('user_') && !record.id.contains('uid_')) {
         return firstBoundUid == null || firstBoundUid == uid || uid == localUserId;
       }
       return false;
     }).toList()
-      ..sort((a, b) => b.startTime.compareTo(a.startTime));
+      ..sort((a, b) => b.fastingEndAt.compareTo(a.fastingEndAt));
   }
 
   Future<void> saveFastingRecord(FastingRecord record) async {
     await fastingRecordsBox.put(record.id, record);
+
+    // If an authenticated user is logged in, immediately update their Firestore document
+    final authUser = AuthService.instance.currentUser;
+    if (authUser != null && authUser.uid.isNotEmpty) {
+      final uid = authUser.uid;
+      final firestoreData = <String, dynamic>{
+        'recordId': record.id,
+        'fastingStartAt': Timestamp.fromDate(record.startTime.toUtc()),
+        'fastingEndAt': record.endTime != null ? Timestamp.fromDate(record.endTime!.toUtc()) : null,
+        'duration': record.fastingMinutes,
+        'eatingMinutes': record.eatingMinutes,
+        'planName': record.planName,
+        'status': record.status,
+        'note': record.note,
+        'reason': record.reason,
+        'createdAt': Timestamp.fromDate(record.createdAt.toUtc()),
+        'updatedAt': Timestamp.fromDate(record.updatedAt.toUtc()),
+        'syncedAt': FieldValue.serverTimestamp(),
+        'isDeleted': false,
+        'syncStatus': 'synced',
+      };
+
+      final firestore = _customFirestore;
+      if (firestore != null) {
+        try {
+          final userDocRef = firestore.collection('users').doc(uid);
+          final recordDocRef = userDocRef.collection('fastingRecords').doc(record.id);
+
+          await recordDocRef.set(firestoreData, SetOptions(merge: true));
+
+          LoggerService.d('[FIRESTORE-RECORD-SYNC] Fasting record ${record.id} synced immediately for UID $uid');
+        } catch (e) {
+          LoggerService.w('HiveService: Mock Firestore fasting record sync error: $e');
+        }
+      } else if (Firebase.apps.isNotEmpty) {
+        try {
+          final userDocRef = FirebaseFirestore.instance.collection('users').doc(uid);
+          final recordDocRef = userDocRef.collection('fastingRecords').doc(record.id);
+
+          await recordDocRef.set(firestoreData, SetOptions(merge: true)).timeout(const Duration(seconds: 2));
+
+          LoggerService.d('[FIRESTORE-RECORD-SYNC] Fasting record ${record.id} synced immediately for UID $uid');
+        } catch (e) {
+          LoggerService.w('HiveService: Firestore fasting record sync error (saved locally): $e');
+        }
+      }
+    }
   }
 
   Future<void> deleteFastingRecord(String id) async {
@@ -614,6 +670,36 @@ class HiveService {
       await settingsBox.put('deleted_sessions', updated);
     }
     await fastingRecordsBox.delete(id);
+
+    final authUser = AuthService.instance.currentUser;
+    if (authUser != null && authUser.uid.isNotEmpty) {
+      final uid = authUser.uid;
+      final softDeletePayload = <String, dynamic>{
+        'recordId': id,
+        'isDeleted': true,
+        'updatedAt': Timestamp.fromDate(DateTime.now().toUtc()),
+        'syncedAt': FieldValue.serverTimestamp(),
+      };
+
+      final firestore = _customFirestore;
+      if (firestore != null) {
+        try {
+          final userDocRef = firestore.collection('users').doc(uid);
+          await userDocRef.collection('fastingRecords').doc(id).set(softDeletePayload, SetOptions(merge: true));
+          LoggerService.d('[FIRESTORE-RECORD-DELETE] Fasting record $id soft-deleted in Mock Firestore for UID $uid');
+        } catch (e) {
+          LoggerService.w('HiveService: Mock Firestore fasting record delete error: $e');
+        }
+      } else if (Firebase.apps.isNotEmpty) {
+        try {
+          final userDocRef = FirebaseFirestore.instance.collection('users').doc(uid);
+          await userDocRef.collection('fastingRecords').doc(id).set(softDeletePayload, SetOptions(merge: true)).timeout(const Duration(seconds: 2));
+          LoggerService.d('[FIRESTORE-RECORD-DELETE] Fasting record $id soft-deleted in Firestore for UID $uid');
+        } catch (e) {
+          LoggerService.w('HiveService: Firestore fasting record delete error (deleted locally): $e');
+        }
+      }
+    }
   }
 
   // ── Weight Entries ──
@@ -621,10 +707,16 @@ class HiveService {
   List<WeightEntry> get allWeightEntries {
     final uid = currentActiveUserId;
     final firstBoundUid = getSetting<String>('first_bound_uid');
+    final accounts = knownAccounts.map((a) => a['uid']).whereType<String>().toSet();
 
     final all = weightEntriesBox.values.toList();
     return all.where((entry) {
-      if (entry.id.contains(uid)) return true;
+      if (entry.id.startsWith('${uid}_') || entry.id.contains(uid)) return true;
+      for (final otherUid in accounts) {
+        if (otherUid != uid && (entry.id.startsWith('${otherUid}_') || entry.id.contains(otherUid))) {
+          return false;
+        }
+      }
       if (!entry.id.contains('user_') && !entry.id.contains('uid_')) {
         return firstBoundUid == null || firstBoundUid == uid || uid == localUserId;
       }
@@ -636,10 +728,104 @@ class HiveService {
 
   Future<void> saveWeightEntry(WeightEntry entry) async {
     await weightEntriesBox.put(entry.id, entry);
+
+    // If an authenticated user is logged in, immediately update their Firestore document
+    final authUser = AuthService.instance.currentUser;
+    if (authUser != null && authUser.uid.isNotEmpty) {
+      final uid = authUser.uid;
+      final firestoreData = <String, dynamic>{
+        'id': entry.id,
+        'weightKg': entry.weightKg,
+        'date': Timestamp.fromDate(entry.date.toUtc()),
+        'timestamp': entry.date.millisecondsSinceEpoch,
+        if (entry.bodyFatPercentage != null) 'bodyFatPercentage': entry.bodyFatPercentage,
+        if (entry.leanMassKg != null) 'leanMassKg': entry.leanMassKg,
+        if (entry.fatMassKg != null) 'fatMassKg': entry.fatMassKg,
+        if (entry.bmi != null) 'bmi': entry.bmi,
+        if (entry.bmr != null) 'bmr': entry.bmr,
+        if (entry.tdee != null) 'tdee': entry.tdee,
+        if (entry.waistCm != null) 'waistCm': entry.waistCm,
+        if (entry.neckCm != null) 'neckCm': entry.neckCm,
+        if (entry.hipCm != null) 'hipCm': entry.hipCm,
+        if (entry.chestCm != null) 'chestCm': entry.chestCm,
+        if (entry.leftArmCm != null) 'leftArmCm': entry.leftArmCm,
+        if (entry.rightArmCm != null) 'rightArmCm': entry.rightArmCm,
+        if (entry.leftForearmCm != null) 'leftForearmCm': entry.leftForearmCm,
+        if (entry.rightForearmCm != null) 'rightForearmCm': entry.rightForearmCm,
+        if (entry.leftThighCm != null) 'leftThighCm': entry.leftThighCm,
+        if (entry.rightThighCm != null) 'rightThighCm': entry.rightThighCm,
+        if (entry.leftCalfCm != null) 'leftCalfCm': entry.leftCalfCm,
+        if (entry.rightCalfCm != null) 'rightCalfCm': entry.rightCalfCm,
+        if (entry.shoulderCm != null) 'shoulderCm': entry.shoulderCm,
+        if (entry.note != null) 'note': entry.note,
+        'createdAt': Timestamp.fromDate(entry.createdAt.toUtc()),
+        'updatedAt': Timestamp.fromDate(entry.updatedAt.toUtc()),
+        'syncedAt': FieldValue.serverTimestamp(),
+        'isDeleted': false,
+        'syncStatus': 'synced',
+      };
+
+      final firestore = _customFirestore;
+      if (firestore != null) {
+        try {
+          final userDocRef = firestore.collection('users').doc(uid);
+          final logDocRef = userDocRef.collection('weightLogs').doc(entry.id);
+          await logDocRef.set(firestoreData, SetOptions(merge: true));
+          LoggerService.d('[FIRESTORE-WEIGHT-SYNC] Weight log ${entry.id} synced immediately for UID $uid');
+        } catch (e) {
+          LoggerService.w('HiveService: Mock Firestore weight log sync error: $e');
+        }
+      } else if (Firebase.apps.isNotEmpty) {
+        try {
+          final userDocRef = FirebaseFirestore.instance.collection('users').doc(uid);
+          final logDocRef = userDocRef.collection('weightLogs').doc(entry.id);
+          await logDocRef.set(firestoreData, SetOptions(merge: true)).timeout(const Duration(seconds: 2));
+          LoggerService.d('[FIRESTORE-WEIGHT-SYNC] Weight log ${entry.id} synced immediately for UID $uid');
+        } catch (e) {
+          LoggerService.w('HiveService: Firestore weight log sync error (saved locally): $e');
+        }
+      }
+    }
   }
 
   Future<void> deleteWeightEntry(String id) async {
+    final deleted = settingsBox.get('deleted_weight_logs') as List?;
+    final updated = deleted != null ? List<String>.from(deleted.map((e) => e.toString())) : <String>[];
+    if (!updated.contains(id)) {
+      updated.add(id);
+      await settingsBox.put('deleted_weight_logs', updated);
+    }
     await weightEntriesBox.delete(id);
+
+    final authUser = AuthService.instance.currentUser;
+    if (authUser != null && authUser.uid.isNotEmpty) {
+      final uid = authUser.uid;
+      final softDeletePayload = <String, dynamic>{
+        'id': id,
+        'isDeleted': true,
+        'updatedAt': Timestamp.fromDate(DateTime.now().toUtc()),
+        'syncedAt': FieldValue.serverTimestamp(),
+      };
+
+      final firestore = _customFirestore;
+      if (firestore != null) {
+        try {
+          final userDocRef = firestore.collection('users').doc(uid);
+          await userDocRef.collection('weightLogs').doc(id).set(softDeletePayload, SetOptions(merge: true));
+          LoggerService.d('[FIRESTORE-WEIGHT-DELETE] Weight log $id soft-deleted in Mock Firestore for UID $uid');
+        } catch (e) {
+          LoggerService.w('HiveService: Mock Firestore weight log delete error: $e');
+        }
+      } else if (Firebase.apps.isNotEmpty) {
+        try {
+          final userDocRef = FirebaseFirestore.instance.collection('users').doc(uid);
+          await userDocRef.collection('weightLogs').doc(id).set(softDeletePayload, SetOptions(merge: true)).timeout(const Duration(seconds: 2));
+          LoggerService.d('[FIRESTORE-WEIGHT-DELETE] Weight log $id soft-deleted in Firestore for UID $uid');
+        } catch (e) {
+          LoggerService.w('HiveService: Firestore weight log delete error (deleted locally): $e');
+        }
+      }
+    }
   }
 
   // ── Active Session ──

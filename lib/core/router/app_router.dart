@@ -22,11 +22,14 @@ import 'package:fast_flow/features/food/presentation/screens/ai_camera_preview_s
 import 'package:fast_flow/features/food/presentation/screens/ai_food_result_screen.dart';
 import 'package:fast_flow/features/food/data/models/food_product.dart';
 import 'package:fast_flow/features/food/data/models/food_recognition_model.dart';
+import 'package:fast_flow/features/auth/presentation/screens/account_choice_screen.dart';
 import 'package:fast_flow/features/auth/presentation/screens/login_screen.dart';
 import 'package:fast_flow/features/auth/presentation/screens/register_screen.dart';
 import 'package:fast_flow/features/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:fast_flow/features/auth/presentation/screens/reset_password_screen.dart';
 import 'package:fast_flow/shared/widgets/app_scaffold.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:fast_flow/features/auth/presentation/screens/account_screen.dart';
 
@@ -36,6 +39,7 @@ class AppRouter {
 
   AppRouter({required this.prefs});
 
+  static const String accountChoice = '/account-choice';
   static const String onboarding = '/onboarding';
   static const String login = '/login';
   static const String register = '/register';
@@ -61,23 +65,45 @@ class AppRouter {
     navigatorKey: _rootNavigatorKey,
     initialLocation: home,
     redirect: (context, state) {
-      if (state.matchedLocation == '/') return home;
-      final isOnboarding = state.matchedLocation == onboarding;
+      final loc = state.matchedLocation;
+      if (loc == '/') return home;
 
-      final isLogin = state.matchedLocation == login;
-      final isRegister = state.matchedLocation == register;
-      final isAccount = state.matchedLocation == account;
-      final isForgotPassword = state.matchedLocation == forgotPassword || state.matchedLocation.startsWith(forgotPassword);
-      final isResetPassword = state.matchedLocation == resetPassword || state.matchedLocation.startsWith(resetPassword);
+      final isAccountChoice = loc == accountChoice;
+      final isOnboarding = loc == onboarding;
+      final isLogin = loc == login;
+      final isRegister = loc == register;
+      final isAccount = loc == account;
+      final isForgotPassword = loc == forgotPassword || loc.startsWith(forgotPassword);
+      final isResetPassword = loc == resetPassword || loc.startsWith(resetPassword);
+
+      final isAuthRoute = isAccountChoice || isOnboarding || isLogin || isRegister || isAccount || isForgotPassword || isResetPassword;
 
       final onboarded = HiveService.instance.hasCompletedOnboardingForUser();
 
-      if (!onboarded && !isOnboarding && !isLogin && !isRegister && !isAccount && !isForgotPassword && !isResetPassword) return onboarding;
-      if (onboarded && isOnboarding) return home;
+      if (!onboarded) {
+        if (!isAuthRoute) {
+          bool isUserLoggedIn = false;
+          if (Firebase.apps.isNotEmpty) {
+            try {
+              isUserLoggedIn = FirebaseAuth.instance.currentUser != null;
+            } catch (_) {}
+          }
+          return isUserLoggedIn ? onboarding : accountChoice;
+        }
+        return null;
+      }
+
+      if (isAccountChoice || isOnboarding) {
+        return home;
+      }
       return null;
     },
 
     routes: [
+      GoRoute(
+        path: accountChoice,
+        builder: (context, state) => const AccountChoiceScreen(),
+      ),
       GoRoute(
         path: onboarding,
         builder: (context, state) => const OnboardingScreen(),

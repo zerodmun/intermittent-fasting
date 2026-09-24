@@ -34,7 +34,24 @@ extension DurationExtensions on Duration {
     final parts = <String>[];
     if (inDays > 0) parts.add('${inDays}d');
     if (inHours % 24 > 0) parts.add('${inHours % 24}h');
-    if (inMinutes % 60 > 0) parts.add('${inMinutes % 60}m');
     return parts.isEmpty ? '0m' : parts.join(' ');
+  }
+
+  /// Format as spelled out duration (e.g. "17 hours 40 minutes" or "18 hours" or "45 minutes")
+  String get toDetailedSpelledOut {
+    final h = inHours;
+    final m = inMinutes % 60;
+    if (h > 0 && m > 0) {
+      final hourStr = h == 1 ? 'hour' : 'hours';
+      final minStr = m == 1 ? 'minute' : 'minutes';
+      return '$h $hourStr $m $minStr';
+    } else if (h > 0) {
+      final hourStr = h == 1 ? 'hour' : 'hours';
+      return '$h $hourStr';
+    } else if (m > 0) {
+      final minStr = m == 1 ? 'minute' : 'minutes';
+      return '$m $minStr';
+    }
+    return '$inSeconds seconds';
   }
 }

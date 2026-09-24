@@ -127,6 +127,7 @@ class AuthService {
         'deviceId': deviceId,
         'accountStatus': 'active',
         'updatedAt': FieldValue.serverTimestamp(),
+        'lastSeen': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
       final deviceDocRef = userDocRef.collection('devices').doc(deviceId);
@@ -134,6 +135,7 @@ class AuthService {
         'deviceId': deviceId,
         'status': 'active',
         'updatedAt': FieldValue.serverTimestamp(),
+        'lastSeen': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
       LoggerService.w('AuthService: Device binding transfer warning: $e');
@@ -161,15 +163,99 @@ class AuthService {
         'deviceId': FieldValue.delete(),
         'accountStatus': 'unlinked',
         'updatedAt': FieldValue.serverTimestamp(),
+        'lastSeen': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
       final deviceDocRef = userDocRef.collection('devices').doc(deviceId);
       await deviceDocRef.set({
         'status': 'unlinked',
         'updatedAt': FieldValue.serverTimestamp(),
+        'lastSeen': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
       LoggerService.w('AuthService: Unbind device warning: $e');
+    }
+  }
+
+  /// Safely checks whether an existing device binding represents a genuine concurrent device conflict
+  /// or a stale session / reinstall on the same physical device.
+  Future<bool> _checkDeviceConflict({
+    required DocumentReference<Map<String, dynamic>> userDocRef,
+    required String storedDeviceId,
+    required String currentDeviceId,
+  }) async {
+    try {
+      // 1. Fetch stored device document
+      final storedDeviceDoc = await userDocRef
+          .collection('devices')
+          .doc(storedDeviceId)
+          .get()
+          .timeout(const Duration(seconds: 5));
+
+      if (!storedDeviceDoc.exists) {
+        // Orphaned device binding with no subcollection record -> treat as stale, allow login
+        LoggerService.i('AuthService: Stale orphaned device binding $storedDeviceId resolved.');
+        return false;
+      }
+
+      final deviceData = storedDeviceDoc.data() ?? {};
+      final status = deviceData['status'] as String?;
+
+      // 2. If status is explicitly unlinked or inactive -> allow login
+      if (status == 'unlinked' || status == 'inactive' || status == 'stale') {
+        LoggerService.i('AuthService: Unlinked/inactive device binding $storedDeviceId resolved.');
+        return false;
+      }
+
+      // 3. Check FCM token matching (indicates same physical device after reinstall)
+      final currentFcmToken = await FcmService.instance.getFcmToken();
+      final storedFcmToken = deviceData['fcmToken'] as String?;
+
+      if (currentFcmToken != null &&
+          currentFcmToken.isNotEmpty &&
+          storedFcmToken != null &&
+          storedFcmToken.isNotEmpty &&
+          currentFcmToken == storedFcmToken) {
+        LoggerService.i('AuthService: Matched existing FCM token for device $storedDeviceId (same device reinstall).');
+        return false;
+      }
+
+      // 4. Check if current FCM token matches any registered device in the subcollection
+      if (currentFcmToken != null && currentFcmToken.isNotEmpty) {
+        final tokenQuery = await userDocRef
+            .collection('devices')
+            .where('fcmToken', isEqualTo: currentFcmToken)
+            .get()
+            .timeout(const Duration(seconds: 5));
+        if (tokenQuery.docs.isNotEmpty) {
+          LoggerService.i('AuthService: Current FCM token matched existing device subcollection record.');
+          return false;
+        }
+      }
+
+      // 5. Stale session timestamp check: if last activity was > 30 days ago, consider stale
+      final updatedAt = deviceData['lastSeen'] ?? deviceData['updatedAt'];
+      DateTime? lastActivity;
+      if (updatedAt is Timestamp) {
+        lastActivity = updatedAt.toDate();
+      } else if (updatedAt is String) {
+        lastActivity = DateTime.tryParse(updatedAt);
+      }
+      if (lastActivity != null) {
+        final diff = DateTime.now().difference(lastActivity);
+        if (diff.inDays > 30) {
+          LoggerService.i('AuthService: Device $storedDeviceId binding is stale (> 30 days inactive).');
+          return false;
+        }
+      }
+
+      // 6. Confirmed active session on a different physical device
+      LoggerService.w('AuthService: Genuine device conflict detected. Stored: $storedDeviceId, Current: $currentDeviceId');
+      return true;
+    } catch (e) {
+      LoggerService.w('AuthService: Device conflict check warning: $e');
+      // In case of error querying Firestore subcollections, avoid falsely blocking the legitimate owner
+      return false;
     }
   }
 
@@ -195,6 +281,7 @@ class AuthService {
         'deviceId': deviceId,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        'lastSeen': FieldValue.serverTimestamp(),
         'accountStatus': 'active',
       }, SetOptions(merge: true));
 
@@ -229,10 +316,19 @@ class AuthService {
         final data = docSnap.data();
         final storedDeviceId = data?['deviceId'] as String?;
 
-        if (storedDeviceId != null && storedDeviceId != deviceId) {
-          // Account already bound to a DIFFERENT physical device
-          await _auth.signOut();
-          throw DeviceAlreadyLinkedException();
+        if (storedDeviceId != null && storedDeviceId.isNotEmpty && storedDeviceId != deviceId) {
+          // Reconcile registered devices to distinguish reinstall/stale session from another active device
+          final hasConflict = await _checkDeviceConflict(
+            userDocRef: userDocRef,
+            storedDeviceId: storedDeviceId,
+            currentDeviceId: deviceId,
+          );
+
+          if (hasConflict) {
+            // Account already bound to an active DIFFERENT physical device
+            await _auth.signOut();
+            throw DeviceAlreadyLinkedException();
+          }
         }
       }
 

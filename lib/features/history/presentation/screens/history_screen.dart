@@ -82,44 +82,48 @@ class HistoryScreen extends ConsumerWidget {
   Widget _buildHistoryCard(BuildContext context, WidgetRef ref, FastingRecord record) {
     final theme = Theme.of(context);
     final isCompleted = record.status == 'completed';
+    final endDateFormatted = DateFormat('d MMMM yyyy').format(record.fastingEndAt);
 
     return AppCard.elevated(
       padding: EdgeInsets.zero,
-      child: ListTile(
-        onTap: () => _editManualLogSheet(context, record, ref),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.xs,
-        ),
-        leading: Container(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          decoration: BoxDecoration(
-            color: isCompleted
-                ? context.colors.success.withValues(alpha: 0.1)
-                : theme.colorScheme.error.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          onTap: () => _editManualLogSheet(context, record, ref),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
           ),
-          child: Icon(
-            isCompleted ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
-            color: isCompleted ? context.colors.success : theme.colorScheme.error,
+          leading: Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: isCompleted
+                  ? context.colors.success.withValues(alpha: 0.1)
+                  : theme.colorScheme.error.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isCompleted ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
+              color: isCompleted ? context.colors.success : theme.colorScheme.error,
+            ),
           ),
-        ),
-        title: Text(
-          record.planName,
-          style: theme.textTheme.bodyLarge?.copyWith(
-            fontWeight: FontWeight.bold,
+          title: Text(
+            endDateFormatted,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        subtitle: Text(
-          '${DateFormat('MMM dd, yyyy').format(record.startTime)} • ${record.actualDuration.toReadable}',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+          subtitle: Text(
+            '${record.planName} • ${record.actualDuration.toReadable}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline_rounded),
-          color: theme.colorScheme.error,
-          onPressed: () => _confirmDelete(context, ref, record.id),
+          trailing: IconButton(
+            icon: const Icon(Icons.delete_outline_rounded),
+            color: theme.colorScheme.error,
+            onPressed: () => _confirmDelete(context, ref, record.id),
+          ),
         ),
       ),
     );
@@ -210,7 +214,6 @@ class HistoryScreen extends ConsumerWidget {
       isDestructive: true,
     );
 
-
     if (confirm == true) {
       await ref.read(historyProviderNotifier.notifier).deleteRecord(id);
       if (context.mounted) {
@@ -221,7 +224,7 @@ class HistoryScreen extends ConsumerWidget {
 
   List<FastingRecord> _getEventsForDay(WidgetRef ref, DateTime day) {
     final records = ref.read(historyProvider);
-    return records.where((r) => r.startTime.isSameDay(day)).toList();
+    return records.where((r) => r.fastingEndAt.isSameDay(day)).toList();
   }
 
   FastingRecord? _getRecordForDay(WidgetRef ref, DateTime day) {
@@ -232,7 +235,7 @@ class HistoryScreen extends ConsumerWidget {
   void _editManualLogSheet(BuildContext context, FastingRecord existing, WidgetRef ref) {
     final noteController = TextEditingController(text: existing.note ?? '');
     DateTime startTime = existing.startTime;
-    DateTime endTime = existing.endTime ?? existing.startTime.add(Duration(minutes: existing.fastingMinutes));
+    DateTime endTime = existing.fastingEndAt;
     String status = existing.status;
 
     Future<DateTime?> selectDateTime(BuildContext ctx, DateTime initial) async {
@@ -257,153 +260,231 @@ class HistoryScreen extends ConsumerWidget {
 
     AppBottomSheet.show(
       context: context,
-      title: 'Edit Day Log',
+      title: 'Fasting Session Details',
       child: StatefulBuilder(
         builder: (context, setState) {
           final theme = Theme.of(context);
           final colorScheme = theme.colorScheme;
-          final duration = endTime.difference(startTime);
+          final bool isValid = endTime.isAfter(startTime);
+          final duration = isValid ? endTime.difference(startTime) : Duration.zero;
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Start Date Time
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Start Time:', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  TextButton.icon(
-                    onPressed: () async {
-                      final dt = await selectDateTime(context, startTime);
-                      if (dt != null) {
-                        setState(() {
-                          startTime = dt;
-                          if (endTime.isBefore(startTime)) {
-                            endTime = startTime.add(const Duration(hours: 16));
-                          }
-                        });
-                      }
-                    },
-                    icon: const Icon(Icons.calendar_today_rounded, size: 16),
-                    label: Text(DateFormat('MMM dd, HH:mm').format(startTime)),
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Fasting Start Details Card
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                   ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // End Date Time
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('End Time:', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  TextButton.icon(
-                    onPressed: () async {
-                      final dt = await selectDateTime(context, endTime);
-                      if (dt != null) {
-                        setState(() {
-                          endTime = dt;
-                          if (endTime.isBefore(startTime)) {
-                            startTime = endTime.subtract(const Duration(hours: 16));
-                          }
-                        });
-                      }
-                    },
-                    icon: const Icon(Icons.calendar_today_rounded, size: 16),
-                    label: Text(DateFormat('MMM dd, HH:mm').format(endTime)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Fasting Start',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () async {
+                              final dt = await selectDateTime(context, startTime);
+                              if (dt != null) {
+                                setState(() {
+                                  startTime = dt;
+                                });
+                              }
+                            },
+                            icon: const Icon(Icons.edit_calendar_rounded, size: 16),
+                            label: const Text('Change'),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        DateFormat('d MMMM yyyy').format(startTime),
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        DateFormat('HH:mm').format(startTime),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // Calculated Duration info
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-                decoration: BoxDecoration(
-                  color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Calculated Fast:', style: theme.textTheme.bodySmall),
-                    Text(
-                      duration.inMinutes % 60 == 0
-                          ? '${duration.inHours}h'
-                          : '${duration.inHours}h ${duration.inMinutes % 60}m',
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                    ),
+                const SizedBox(height: AppSpacing.sm),
+
+                // Fasting End Details Card
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Fasting End',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () async {
+                              final dt = await selectDateTime(context, endTime);
+                              if (dt != null) {
+                                setState(() {
+                                  endTime = dt;
+                                });
+                              }
+                            },
+                            icon: const Icon(Icons.edit_calendar_rounded, size: 16),
+                            label: const Text('Change'),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        DateFormat('d MMMM yyyy').format(endTime),
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        DateFormat('HH:mm').format(endTime),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+
+                // Duration Card
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: isValid
+                        ? colorScheme.primaryContainer.withValues(alpha: 0.35)
+                        : colorScheme.errorContainer.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Duration',
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        isValid ? duration.toDetailedSpelledOut : 'Invalid time range',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: isValid ? colorScheme.primary : colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!isValid) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Fasting end time must be after start time.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.error),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.md),
+
+                // Status Dropdown
+                DropdownButtonFormField<String>(
+                  initialValue: status,
+                  decoration: const InputDecoration(
+                    labelText: 'Fasting Status',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                    DropdownMenuItem(value: 'skipped', child: Text('Skipped')),
+                    DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
                   ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // Status Dropdown
-              DropdownButtonFormField<String>(
-                initialValue: status,
-                decoration: const InputDecoration(
-                  labelText: 'Fasting Status',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'completed', child: Text('Completed')),
-                  DropdownMenuItem(value: 'skipped', child: Text('Skipped')),
-                  DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
-                ],
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() {
-                      status = val;
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              AppInput(
-                label: 'Note',
-                controller: noteController,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-
-              AppButton.primary(
-                label: 'Save Changes',
-                onPressed: () {
-                  ref.read(fastingStateNotifierProvider.notifier).editFastingRecord(
-                    id: existing.id,
-                    startTime: startTime,
-                    endTime: endTime,
-                    status: status,
-                    note: noteController.text,
-                    reason: existing.reason,
-                  );
-                  ref.read(historyProviderNotifier.notifier).refresh();
-                  Navigator.of(context).pop();
-                  context.showSnack('Log updated successfully', isSuccess: true);
-                },
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              AppButton.outlined(
-                label: 'Delete Log',
-                onPressed: () async {
-                  final confirm = await AppDialog.showConfirm(
-                    context: context,
-                    title: 'Delete this data?',
-                    content: 'This data will be permanently removed. This action cannot be undone.',
-                    confirmLabel: 'Delete',
-                    cancelLabel: 'Cancel',
-                    isDestructive: true,
-                  );
-
-                  if (confirm == true && context.mounted) {
-                    await ref.read(historyProviderNotifier.notifier).deleteRecord(existing.id);
-                    if (context.mounted) {
-                      Navigator.of(context).pop();
-                      context.showSnack('Fasting record deleted');
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        status = val;
+                      });
                     }
-                  }
-                },
-              ),
-            ],
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+
+                AppInput(
+                  label: 'Note',
+                  controller: noteController,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+
+                AppButton.primary(
+                  label: 'Save Changes',
+                  onPressed: isValid
+                      ? () {
+                          final success = ref.read(fastingStateNotifierProvider.notifier).editFastingRecord(
+                            id: existing.id,
+                            startTime: startTime,
+                            endTime: endTime,
+                            status: status,
+                            note: noteController.text,
+                            reason: existing.reason,
+                          );
+                          if (success) {
+                            ref.read(historyProviderNotifier.notifier).refresh();
+                            Navigator.of(context).pop();
+                            context.showSnack('Log updated successfully', isSuccess: true);
+                          } else {
+                            context.showSnack('Invalid time range', isError: true);
+                          }
+                        }
+                      : null,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                AppButton.outlined(
+                  label: 'Delete Log',
+                  onPressed: () async {
+                    final confirm = await AppDialog.showConfirm(
+                      context: context,
+                      title: 'Delete this data?',
+                      content: 'This data will be permanently removed. This action cannot be undone.',
+                      confirmLabel: 'Delete',
+                      cancelLabel: 'Cancel',
+                      isDestructive: true,
+                    );
+
+                    if (confirm == true && context.mounted) {
+                      await ref.read(historyProviderNotifier.notifier).deleteRecord(existing.id);
+                      if (context.mounted) {
+                        Navigator.of(context).pop();
+                        context.showSnack('Fasting record deleted');
+                      }
+                    }
+                  },
+                ),
+              ],
+            ),
           );
         },
       ),

@@ -75,7 +75,7 @@ class FastingStateNotifier extends Notifier<FastingState?> {
     engine.onRecordChanged();
   }
 
-  void editFastingRecord({
+  bool editFastingRecord({
     required String id,
     required DateTime startTime,
     required DateTime endTime,
@@ -83,6 +83,9 @@ class FastingStateNotifier extends Notifier<FastingState?> {
     String? note,
     String? reason,
   }) {
+    if (!endTime.isAfter(startTime)) {
+      return false;
+    }
     final existing = HiveService.instance.fastingRecordsBox.get(id);
     if (existing != null) {
       existing.startTime = startTime;
@@ -91,12 +94,15 @@ class FastingStateNotifier extends Notifier<FastingState?> {
       existing.note = note;
       existing.reason = reason;
       existing.fastingMinutes = endTime.difference(startTime).inMinutes;
-      existing.eatingMinutes = 24 * 60 - existing.fastingMinutes;
+      existing.eatingMinutes = (24 * 60 - existing.fastingMinutes).clamp(0, 24 * 60);
+      existing.updatedAt = DateTime.now();
       HiveService.instance.saveFastingRecord(existing);
-      
+
       final engine = ref.read(fastingEngineProvider);
       engine.onRecordChanged();
+      return true;
     }
+    return false;
   }
 }
 

@@ -7,6 +7,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:fast_flow/core/constants/app_spacing.dart';
 import 'package:fast_flow/core/extensions/context_extensions.dart';
 import 'package:fast_flow/core/providers/app_providers.dart';
+import 'package:fast_flow/core/services/hive_service.dart';
 import 'package:fast_flow/shared/widgets/app_card.dart';
 import 'package:fast_flow/shared/widgets/app_button.dart';
 import 'package:fast_flow/shared/widgets/app_input.dart';
@@ -1707,8 +1708,11 @@ class _AddEditEntrySheetState extends State<_AddEditEntrySheet> {
                     hipCm: hip,
                   );
 
+                  final uid = HiveService.instance.currentActiveUserId;
+                  final newId = uid.isNotEmpty ? '${uid}_${const Uuid().v4()}' : const Uuid().v4();
+
                   final entry = WeightEntry(
-                    id: widget.existing?.id ?? const Uuid().v4(),
+                    id: widget.existing?.id ?? newId,
                     weightKg: weight,
                     date: widget.existing?.date ?? DateTime.now(),
                     bodyFatPercentage: compResult.hasBodyFat ? compResult.bodyFatPercentage : null,

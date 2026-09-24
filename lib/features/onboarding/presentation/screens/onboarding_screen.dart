@@ -22,6 +22,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentStep = 0;
 
+  late final TextEditingController _nameController;
+  late final TextEditingController _ageController;
+  late final TextEditingController _heightController;
+  late final TextEditingController _weightController;
+  late final TextEditingController _goalWeightController;
+  late final TextEditingController _targetWaistController;
+  late final TextEditingController _targetBodyFatController;
+
   final List<String> _stepTitles = [
     'Welcome',
     'Personal Profile',
@@ -30,8 +38,28 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    final state = ref.read(onboardingProvider);
+    _nameController = TextEditingController(text: state.name);
+    _ageController = TextEditingController(text: state.ageYears > 0 ? state.ageYears.toString() : '');
+    _heightController = TextEditingController(text: state.heightCm > 0 ? (state.heightCm % 1 == 0 ? state.heightCm.toInt().toString() : state.heightCm.toString()) : '');
+    _weightController = TextEditingController(text: state.weightKg > 0 ? (state.weightKg % 1 == 0 ? state.weightKg.toInt().toString() : state.weightKg.toString()) : '');
+    _goalWeightController = TextEditingController(text: state.goalWeightKg > 0 ? (state.goalWeightKg % 1 == 0 ? state.goalWeightKg.toInt().toString() : state.goalWeightKg.toString()) : '');
+    _targetWaistController = TextEditingController(text: state.targetWaist > 0 ? (state.targetWaist % 1 == 0 ? state.targetWaist.toInt().toString() : state.targetWaist.toString()) : '');
+    _targetBodyFatController = TextEditingController(text: state.targetBodyFat > 0 ? (state.targetBodyFat % 1 == 0 ? state.targetBodyFat.toInt().toString() : state.targetBodyFat.toString()) : '');
+  }
+
+  @override
   void dispose() {
     _pageController.dispose();
+    _nameController.dispose();
+    _ageController.dispose();
+    _heightController.dispose();
+    _weightController.dispose();
+    _goalWeightController.dispose();
+    _targetWaistController.dispose();
+    _targetBodyFatController.dispose();
     super.dispose();
   }
 
@@ -192,12 +220,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           AppInput(
             label: 'Your Name',
             hint: 'E.g., John Doe',
+            controller: _nameController,
             onChanged: (val) => notifier.updateProfile(name: val),
           ),
           const SizedBox(height: AppSpacing.md),
           AppInput(
             label: 'Age (years)',
             hint: '25',
+            controller: _ageController,
             keyboardType: TextInputType.number,
             onChanged: (val) => notifier.updateProfile(ageYears: int.tryParse(val) ?? 25),
           ),
@@ -205,6 +235,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           AppInput(
             label: 'Height (cm)',
             hint: '175',
+            controller: _heightController,
             keyboardType: TextInputType.number,
             onChanged: (val) => notifier.updateProfile(heightCm: double.tryParse(val) ?? 175.0),
           ),
@@ -212,6 +243,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           AppInput(
             label: 'Current Weight (kg)',
             hint: '70',
+            controller: _weightController,
             keyboardType: TextInputType.number,
             onChanged: (val) => notifier.updateProfile(weightKg: double.tryParse(val) ?? 70.0),
           ),
@@ -315,6 +347,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           AppInput(
             label: 'Goal Weight (kg)',
             hint: '65',
+            controller: _goalWeightController,
             keyboardType: TextInputType.number,
             onChanged: (val) => notifier.updateProfile(goalWeightKg: double.tryParse(val) ?? 65.0),
           ),
@@ -322,6 +355,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           AppInput(
             label: 'Target Waist (cm - optional)',
             hint: '80',
+            controller: _targetWaistController,
             keyboardType: TextInputType.number,
             onChanged: (val) => notifier.updateProfile(targetWaist: double.tryParse(val)),
           ),
@@ -329,6 +363,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           AppInput(
             label: 'Target Body Fat % (optional)',
             hint: '15',
+            controller: _targetBodyFatController,
             keyboardType: TextInputType.number,
             onChanged: (val) => notifier.updateProfile(targetBodyFat: double.tryParse(val)),
           ),

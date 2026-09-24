@@ -8,7 +8,9 @@ class HistoryGenerator {
   static Future<void> autoGenerateHistory({
     required FastingSchedule schedule,
     required FastingRecord? Function(DateTime expectedStart) getRecordForSession,
+    bool Function()? isCancelled,
   }) async {
+    if (isCancelled?.call() == true) return;
     final now = DateTime.now();
     // Generate timeline sessions from 7 days ago until now
     final sessions = TimelineGenerator.generateTimeline(
@@ -22,6 +24,7 @@ class HistoryGenerator {
     final deletedSet = deleted != null ? Set<String>.from(deleted.map((e) => e.toString())) : <String>{};
 
     for (final session in sessions) {
+      if (isCancelled?.call() == true) return;
       final expectedStart = session.expectedStart;
       final expectedEnd = session.expectedEnd;
       final sessionId = 'session_${expectedStart.millisecondsSinceEpoch}';

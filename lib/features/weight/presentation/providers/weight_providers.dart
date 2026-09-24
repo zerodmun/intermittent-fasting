@@ -7,6 +7,11 @@ import 'package:fast_flow/features/weight/data/services/body_comp_calculator.dar
 class WeightNotifier extends Notifier<List<WeightEntry>> {
   @override
   List<WeightEntry> build() {
+    final box = HiveService.instance.weightEntriesBox;
+    final subscription = box.watch().listen((_) {
+      state = HiveService.instance.allWeightEntries;
+    });
+    ref.onDispose(() => subscription.cancel());
     return HiveService.instance.allWeightEntries;
   }
 
@@ -22,6 +27,10 @@ class WeightNotifier extends Notifier<List<WeightEntry>> {
 
   Future<void> deleteEntry(String id) async {
     await HiveService.instance.deleteWeightEntry(id);
+    state = HiveService.instance.allWeightEntries;
+  }
+
+  void refresh() {
     state = HiveService.instance.allWeightEntries;
   }
 }

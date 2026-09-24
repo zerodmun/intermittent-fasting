@@ -161,4 +161,98 @@ class WeightEntry extends HiveObject {
       updatedAt: DateTime.now(),
     );
   }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'id': id,
+      'weightKg': weightKg,
+      'date': date.toUtc().toIso8601String(),
+      'timestamp': date.millisecondsSinceEpoch,
+      'bodyFatPercentage': bodyFatPercentage,
+      'leanMassKg': leanMassKg,
+      'fatMassKg': fatMassKg,
+      'bmi': bmi,
+      'bmr': bmr,
+      'tdee': tdee,
+      'waistCm': waistCm,
+      'neckCm': neckCm,
+      'hipCm': hipCm,
+      'chestCm': chestCm,
+      'leftArmCm': leftArmCm,
+      'rightArmCm': rightArmCm,
+      'leftForearmCm': leftForearmCm,
+      'rightForearmCm': rightForearmCm,
+      'leftThighCm': leftThighCm,
+      'rightThighCm': rightThighCm,
+      'leftCalfCm': leftCalfCm,
+      'rightCalfCm': rightCalfCm,
+      'shoulderCm': shoulderCm,
+      'note': note,
+      'createdAt': createdAt.toUtc().toIso8601String(),
+      'updatedAt': updatedAt.toUtc().toIso8601String(),
+      'isDeleted': false,
+      'syncStatus': 'synced',
+    };
+  }
+
+  static WeightEntry fromFirestore(Map<String, dynamic> data, [String? docId]) {
+    DateTime parseDate(dynamic val, DateTime defaultDate) {
+      if (val == null) return defaultDate;
+      if (val is DateTime) return val.toLocal();
+      if (val is int) return DateTime.fromMillisecondsSinceEpoch(val).toLocal();
+      // Handle cloud_firestore Timestamp or dynamic with toDate()
+      try {
+        final dynamic dynVal = val;
+        if (dynVal.toDate != null) {
+          final dynamic dt = dynVal.toDate();
+          if (dt is DateTime) return dt.toLocal();
+        }
+      } catch (_) {}
+      if (val is String) {
+        final parsed = DateTime.tryParse(val);
+        if (parsed != null) return parsed.toLocal();
+      }
+      return defaultDate;
+    }
+
+    double? parseDouble(dynamic val) {
+      if (val == null) return null;
+      if (val is num) return val.toDouble();
+      if (val is String) return double.tryParse(val);
+      return null;
+    }
+
+    final now = DateTime.now();
+    final date = parseDate(data['date'] ?? data['loggedAt'] ?? data['timestamp'], now);
+    final createdAt = parseDate(data['createdAt'], date);
+    final updatedAt = parseDate(data['updatedAt'], now);
+
+    return WeightEntry(
+      id: data['id']?.toString() ?? docId ?? '',
+      weightKg: parseDouble(data['weightKg'] ?? data['weight']) ?? 0.0,
+      date: date,
+      bodyFatPercentage: parseDouble(data['bodyFatPercentage']),
+      leanMassKg: parseDouble(data['leanMassKg']),
+      fatMassKg: parseDouble(data['fatMassKg']),
+      bmi: parseDouble(data['bmi']),
+      bmr: parseDouble(data['bmr']),
+      tdee: parseDouble(data['tdee']),
+      waistCm: parseDouble(data['waistCm']),
+      neckCm: parseDouble(data['neckCm']),
+      hipCm: parseDouble(data['hipCm']),
+      chestCm: parseDouble(data['chestCm']),
+      leftArmCm: parseDouble(data['leftArmCm']),
+      rightArmCm: parseDouble(data['rightArmCm']),
+      leftForearmCm: parseDouble(data['leftForearmCm']),
+      rightForearmCm: parseDouble(data['rightForearmCm']),
+      leftThighCm: parseDouble(data['leftThighCm']),
+      rightThighCm: parseDouble(data['rightThighCm']),
+      leftCalfCm: parseDouble(data['leftCalfCm']),
+      rightCalfCm: parseDouble(data['rightCalfCm']),
+      shoulderCm: parseDouble(data['shoulderCm']),
+      note: data['note']?.toString(),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
 }

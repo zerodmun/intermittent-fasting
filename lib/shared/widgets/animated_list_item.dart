@@ -42,11 +42,16 @@ class _AnimatedListItemState extends State<AnimatedListItem>
       CurvedAnimation(parent: _controller, curve: AppAnimations.decelerate),
     );
 
-    Future.delayed(widget.delayStep * widget.index, () {
-      if (mounted) {
-        _controller.forward();
-      }
-    });
+    final delay = widget.delayStep * widget.index;
+    if (delay == Duration.zero) {
+      _controller.forward();
+    } else {
+      Future.delayed(delay, () {
+        if (mounted) {
+          _controller.forward();
+        }
+      });
+    }
   }
 
   @override

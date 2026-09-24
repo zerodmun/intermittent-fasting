@@ -78,6 +78,10 @@ class FastingRecord extends HiveObject {
     );
   }
 
+  DateTime get fastingStartAt => startTime;
+  DateTime get fastingEndAt => endTime ?? expectedFastingEnd;
+  Duration get duration => fastingEndAt.difference(fastingStartAt);
+
   Duration get fastingDuration => Duration(minutes: fastingMinutes);
   Duration get eatingDuration => Duration(minutes: eatingMinutes);
 
